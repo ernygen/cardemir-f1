@@ -9,19 +9,28 @@ const PAGE = 100;
 export const PGC_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 export const SPRINT_POINTS = [8, 7, 6, 5, 4, 3, 2, 1];
 const CLASSIFIED = new Set(["Finished", "Lapped"]);
+// Eski sezonlarda tur yiyenler "+1 Lap" diye geçer, yenilerde "Lapped"
+const isClassified = (status) =>
+  CLASSIFIED.has(status) || /^\+\d+\s+laps?$/i.test(status || "");
 
-async function fetchJson(path, timeoutMs = 25000) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(BASE + path, { headers: { Accept: "application/json" }, signal: ctrl.signal });
-    if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
-    return res.json();
-  } catch (e) {
-    if (e.name === "AbortError") throw new Error(`API zaman aşımı (25sn): ${path}`);
-    throw e;
-  } finally {
-    clearTimeout(t);
+async function fetchJson(path, timeoutMs = 25000, retries = 3) {
+  for (let attempt = 0; ; attempt++) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(BASE + path, { headers: { Accept: "application/json" }, signal: ctrl.signal });
+      if (res.status === 429 && attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+      return res.json();
+    } catch (e) {
+      if (e.name === "AbortError") throw new Error(`API zaman aşımı (25sn): ${path}`);
+      throw e;
+    } finally {
+      clearTimeout(t);
+    }
   }
 }
 
@@ -52,7 +61,6 @@ const pts = (v) => {
   const n = parseFloat(v);
   return Number.isFinite(n) ? n : 0;
 };
-const isClassified = (status) => CLASSIFIED.has(status);
 
 function fullName(d) {
   return `${d.Driver.givenName} ${d.Driver.familyName}`;
