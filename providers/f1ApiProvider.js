@@ -7,6 +7,7 @@ const BASE = "https://api.jolpi.ca/ergast/f1";
 const PAGE = 100;
 
 export const PGC_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+export const SPRINT_POINTS = [8, 7, 6, 5, 4, 3, 2, 1];
 const CLASSIFIED = new Set(["Finished", "Lapped"]);
 
 async function fetchJson(path, timeoutMs = 25000) {
@@ -60,8 +61,9 @@ function code(d) {
   return d.Driver.code || d.Driver.familyName.slice(0, 3).toUpperCase();
 }
 
-// Bir tur için özel şampiyona hesapları
-function computeRound(roundNo, name, date, rows) {
+// Bir tur için özel şampiyona hesapları (sprint ise 8'lik puan ölçeği)
+function computeRound(roundNo, name, date, rows, sprint = false) {
+  const PTS = sprint ? SPRINT_POINTS : PGC_POINTS;
   const classified = [];
   let maxGrid = 0;
   for (const r of rows) {
@@ -91,23 +93,23 @@ function computeRound(roundNo, name, date, rows) {
   // PGC: splitli — eşit kazançlar slot puanlarını bölüşür
   const pgcSplit = new Map();
   let i = 0;
-  while (i < byGain.length && i < PGC_POINTS.length) {
+  while (i < byGain.length && i < PTS.length) {
     let j = i;
     while (j < byGain.length && byGain[j].gain === byGain[i].gain) j++;
-    const end = Math.min(j, PGC_POINTS.length);
-    const pool = PGC_POINTS.slice(i, end).reduce((a, b) => a + b, 0);
+    const end = Math.min(j, PTS.length);
+    const pool = PTS.slice(i, end).reduce((a, b) => a + b, 0);
     const each = pool / (end - i);
     for (let k = i; k < end; k++) pgcSplit.set(byGain[k].id, each);
     i = j;
   }
   // PGNS: splitsiz — sıra puanını direkt alır
   const pgns = new Map();
-  byGain.slice(0, PGC_POINTS.length).forEach((d, k) => pgns.set(d.id, PGC_POINTS[k]));
+  byGain.slice(0, PTS.length).forEach((d, k) => pgns.set(d.id, PTS[k]));
 
   // Ters: klasmanı sondan başa puanla (sonuncu 25), DNF'sizler yok
   const byReverse = [...cls].sort((a, b) => b.finish - a.finish);
   const ters = new Map();
-  byReverse.slice(0, PGC_POINTS.length).forEach((d, k) => ters.set(d.id, PGC_POINTS[k]));
+  byReverse.slice(0, PTS.length).forEach((d, k) => ters.set(d.id, PTS[k]));
 
   return { round: roundNo, name, date, winner, drivers: classified, byGain, pgcSplit, pgns, ters };
 }
@@ -145,7 +147,7 @@ export async function loadSeason(year) {
     .map(([round, rows]) => {
       const s = schedByRound.get(round) || {};
       const base = (s.name || `Round ${round}`).replace(" Grand Prix", "");
-      const ev = computeRound(round, `${base} Sprint`, s.date || "", rows);
+      const ev = computeRound(round, `${base} Sprint`, s.date || "", rows, true);
       ev.key = `${round}S`; ev.sprint = true; ev.seq = round * 2 - 1;
       sprintSet.add(round);
       return ev;
