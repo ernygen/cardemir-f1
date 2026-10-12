@@ -62,9 +62,20 @@ tbody tr:hover { background:#faf7f4; }
 .bingo { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
 .tile { background:var(--card); border:1px solid var(--line); border-top:5px solid var(--acc); border-radius:10px; padding:22px 14px; text-align:center; cursor:pointer; font-weight:700; font-family:var(--head); font-size:14px; }
 .tile.on { background:#e9f7ee; border-color:#1f7a3d; border-top-color:#1f7a3d; text-decoration:line-through; }
+.trackgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.tcard { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+.tcard:hover { border-color:var(--acc); }
+.timg { position:relative; background:linear-gradient(135deg,#15151e,#3a3a44); aspect-ratio:16/9; }
+.timg img { width:100%; height:100%; object-fit:cover; display:block; }
+.tround { position:absolute; top:8px; left:8px; background:var(--acc); color:#fff; font-family:var(--head); font-size:12px; font-weight:900; padding:3px 10px; border-radius:4px; }
+.tcard .tbody { padding:12px 14px; }
+.tname { font-family:var(--head); font-weight:900; font-style:italic; text-transform:uppercase; font-size:16px; }
+.tmeta { color:var(--mut); font-size:13px; margin:2px 0 6px; }
+.twin { font-size:14px; }
 .bingoBar { display:flex; gap:10px; align-items:center; margin-top:12px; color:var(--mut); }
 .bingoBar button { padding:8px 14px; border-radius:6px; border:1px solid var(--line); background:var(--dark); color:#fff; cursor:pointer; }
 .how { margin-top:18px; color:var(--mut); font-size:14px; }
 footer { text-align:center; color:var(--mut); font-size:12px; padding:18px; }
-@media (max-width:900px){ .split{grid-template-columns:1fr;} }
+@media (max-width:900px){ .split{grid-template-columns:1fr;} .trackgrid{grid-template-columns:repeat(2,1fr);} }
+@media (max-width:600px){ .trackgrid{grid-template-columns:1fr;} }
 @media (max-width:600px){ header{flex-direction:column; gap:10px;} .controls{flex-direction:column;} nav#tabs{top:104px;} .dphoto{width:48px;height:32px;} .carphoto{display:none;} }

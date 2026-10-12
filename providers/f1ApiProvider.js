@@ -115,7 +115,8 @@ function computeRound(roundNo, name, date, rows) {
 export async function loadSeason(year) {
   const schedJson = await fetchJson(`/${year}.json`);
   const schedule = (schedJson.MRData.RaceTable.Races || []).map((r) => ({
-    round: Number(r.round), name: r.raceName, date: r.date, circuit: r.Circuit.circuitName,
+    round: Number(r.round), name: r.raceName, date: r.date,
+    circuit: r.Circuit.circuitName, circuitId: r.Circuit.circuitId,
   }));
   const [resRows] = await Promise.all([fetchAllRows(`/${year}/results.json`)]);
   const byRound = new Map();

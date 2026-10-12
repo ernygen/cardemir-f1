@@ -52,6 +52,23 @@ export function teamLogo(constructorId) {
   return `${IMG}/c_lfill,w_200/q_auto/${VER}/common/f1/2026/${m.slug}/2026${m.slug}logo.webp`;
 }
 
+// Pist kartları (formula1.com/en/racing/2026) — circuitId -> kart slug
+const TRACK_CARD = {
+  albert_park: "australia", shanghai: "china", suzuka: "japan", miami: "miami",
+  villeneuve: "canada", monaco: "monaco", catalunya: "spain", red_bull_ring: "austria",
+  silverstone: "great-britain", spa: "belgium", hungaroring: "hungary",
+  zandvoort: "netherlands", monza: "italy", madring: "spain", baku: "azerbaijan",
+  sepang: "bahrain", marina_bay: "singapore", americas: "united-states",
+  rodriguez: "mexico", interlagos: "brazil", vegas: "las-vegas",
+  losail: "qatar", yas_marina: "abu-dhabi",
+};
+
+export function trackCardPhoto(circuitId) {
+  const s = TRACK_CARD[circuitId];
+  if (!s) return null;
+  return `${IMG}/c_lfill,w_720/q_auto/${VER}/fom-website/static-assets/2026/races/card/${s}.webp`;
+}
+
 export function teamColor(constructorId) {
   return (TEAM_META[constructorId] || {}).color || "#e10600";
 }

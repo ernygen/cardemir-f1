@@ -1,13 +1,13 @@
 import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js";
 import * as api from "./providers/f1ApiProvider.js";
-import { driverPhoto, teamCarPhoto, teamLogo, teamColor, imgTag } from "./assets.js";
+import { driverPhoto, teamCarPhoto, teamLogo, trackCardPhoto, teamColor, imgTag } from "./assets.js";
 
 // Fotoğraflar sadece 2026 sezonu için (formula1.com 2026 kadrosu)
 const PHOTOS = () => S.season === "2026";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
-  ["cal", "Yarış Takvimi"], ["drivers", "Pilotlar Şampiyonası"], ["teams", "Takımlar Şampiyonası"],
+  ["cal", "Yarış Takvimi"], ["tracks", "Pistler"], ["drivers", "Pilotlar Şampiyonası"], ["teams", "Takımlar Şampiyonası"],
   ["qr", "Grid / Yarış"], ["pg", "Position Gain"], ["pgnn", "Position Gain No Negative"],
   ["pgc", "Position Gaining Championship"], ["pgns", "Position Gaining No Split"], ["ters", "Ters Şampiyona"],
   ["history", "Tarihçe"], ["bingo", "Bingo"],
@@ -120,6 +120,21 @@ function render() {
         return `<tr><td class="pos">R${s.round}</td><td>${esc(s.name)}</td><td>${esc(s.date)}</td><td>${esc(s.circuit)}</td><td>${rd && rd.winner ? `<b>${esc(rd.winner.code)}</b> <span class="mut">${esc(rd.winner.team)}</span>` : "<span class='mut'>—</span>"}</td></tr>`;
       }));
     stat = `${d.schedule.length} yarış • ${done.size} tamamlandı`;
+  } else if (S.tab === "tracks") {
+    const cards = d.schedule.filter((s) => matchQ(s.name, s.circuit)).map((s) => {
+      const rd = d.rounds.find((r) => r.round === s.round);
+      const img = S.season === "2026" ? imgTag(trackCardPhoto(s.circuitId), s.name, "trackimg") : "";
+      const win = rd && rd.winner
+        ? `<div class="twin">🏆 <b>${esc(rd.winner.code)}</b> <span class="mut">${esc(rd.winner.team)}</span></div>`
+        : `<div class="twin mut">⏳ ${esc(s.date)}</div>`;
+      return `<div class="tcard" data-round="${s.round}">
+        <div class="timg">${img}<span class="tround">R${s.round}</span></div>
+        <div class="tbody"><div class="tname">${esc(s.name)}</div>
+        <div class="tmeta">${esc(s.circuit)}</div>${win}</div>
+      </div>`;
+    });
+    html = `<div class="trackgrid">${cards.join("") || "Sonuç yok"}</div>`;
+    stat = `${d.schedule.length} pist • karta tıkla Grid/Yarış detayına git`;
   } else if (S.tab === "drivers" || S.tab === "teams") {
     const isD = S.tab === "drivers";
     const opts = { who: isD ? "drivers" : "teams", metric: "real" };
@@ -260,6 +275,17 @@ function render() {
   $("content").innerHTML = html;
   $("statLine").textContent = stat;
   if (S.tab === "bingo") initBingo();
+  const tg = document.querySelector("#content .trackgrid");
+  if (tg) tg.onclick = (e) => {
+    const c = e.target.closest(".tcard");
+    if (!c) return;
+    const r = api.getRound(S.data, c.dataset.round);
+    if (!r) return; // henüz koşulmamış yarışın detayı yok
+    S.round = c.dataset.round;
+    S.tab = "qr";
+    [...$("tabs").children].forEach((x) => x.classList.toggle("active", x.dataset.t === "qr"));
+    render();
+  };
 }
 
 // --- Bingo ---
