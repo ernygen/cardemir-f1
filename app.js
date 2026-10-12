@@ -1,6 +1,6 @@
 import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js";
 import * as api from "./providers/f1ApiProvider.js";
-import { teamCarPhoto, teamLogo, trackCardPhoto, teamColor, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki } from "./assets.js";
+import { driverPhoto, teamCarPhoto, teamLogo, trackCardPhoto, teamColor, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki } from "./assets.js";
 
 // Fotoğraflar sadece 2026 sezonu için (formula1.com 2026 kadrosu)
 const PHOTOS = () => S.season === "2026";
@@ -107,8 +107,8 @@ function avgQF(d, id) {
   return [a(gS, gN), a(fS, fN)];
 }
 
-// Pilot fotosu: her yıl Wikipedia portresi
-const photoFor = (x, cls) => wikiImg(x.wiki, cls, x.name);
+// Pilot fotosu: 2026'da F1 CDN kesitleri, eski sezonlarda Wikipedia portresi
+const photoFor = (x, cls) => PHOTOS() ? imgTag(driverPhoto(x.code), x.name, cls) : wikiImg(x.wiki, cls, x.name);
 // Takım görseli: 2026'da F1 CDN, eskilerde Wikipedia (logo dosya araması, yoksa makale görseli)
 const teamImgFor = (d, id, name, cls, kind) => {
   if (PHOTOS()) return imgTag(kind === "car" ? teamCarPhoto(id) : teamLogo(id), name, cls);

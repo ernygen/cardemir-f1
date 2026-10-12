@@ -18,6 +18,28 @@ export const TEAM_META = {
   cadillac:     { slug: "cadillac",      color: "#909090" },
 };
 
+// pilot kodu -> [takım slug, pilot slug] (formula1.com/en/drivers 2026)
+const DRIVER_SLUG = {
+  RUS: ["mercedes", "georus"], ANT: ["mercedes", "andant"],
+  LEC: ["ferrari", "chalec"], HAM: ["ferrari", "lewham"],
+  NOR: ["mclaren", "lannor"], PIA: ["mclaren", "oscpia"],
+  VER: ["redbullracing", "maxver"], HAD: ["redbullracing", "isahad"],
+  LAW: ["racingbulls", "lialaw"], LIN: ["racingbulls", "arvlin"],
+  GAS: ["alpine", "piegas"], COL: ["alpine", "fracol"],
+  OCO: ["haasf1team", "estoco"], BEA: ["haasf1team", "olibea"],
+  HUL: ["audi", "nichul"], BOR: ["audi", "gabbor"],
+  SAI: ["williams", "carsai"], ALB: ["williams", "alealb"],
+  ALO: ["astonmartin", "feralo"], STR: ["astonmartin", "lanstr"],
+  PER: ["cadillac", "serper"], BOT: ["cadillac", "valbot"],
+};
+
+export function driverPhoto(code) {
+  const s = DRIVER_SLUG[code];
+  if (!s) return null;
+  const [team, drv] = s;
+  return `${IMG}/c_lfill,w_440/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/${VER}/common/f1/2026/${team}/${drv}01/2026${team}${drv}01right.webp`;
+}
+
 export function teamCarPhoto(constructorId) {
   const m = TEAM_META[constructorId];
   if (!m) return null;

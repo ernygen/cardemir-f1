@@ -1,42 +1,43 @@
 # Cardemir F1 🏁
 
-Canlı F1 verisiyle Cardemir özel şampiyonaları. Site: **https://ernygen.github.io/cardemir-f1/**
+Custom F1 championships on live data. Site: **https://ernygen.github.io/cardemir-f1/**
 
-Excel (`F126.xlsx`) sadece konsepttir — veri alınmaz.
+The Excel file (`F126.xlsx`) is concept only — no data is taken from it.
 
-## Sekmeler
+## Tabs
 
-- **Yarış Takvimi** — sezon takvimi + kazananlar
-- **Pistler** — F1 tarzı 3'lü pist kartları (karta tıkla, tur detayına git)
-- **Pilotlar / Takımlar Şampiyonası** — gerçek puanlar, solda son yarış, sağda full tablo + sıra okları (▲▼)
-- **Grid / Yarış** — yarış başlangıç gridi → yarış sonucu
-- **Position Gain (PG)** — grid − finiş; **PGNN** negatifleri 0 sayar
-- **Position Gaining Championship (PGC)** — tur başına ilk 10'a 25-18-15…; eşitlikte puan bölüşülür
-- **Position Gaining No Split (PGNS)** — bölüşmesiz direkt sıra puanı
-- **Ters Şampiyona** — klasmanı bitirenler sondan başa puanlanır (sonuncu 25), DNF yok
-- **Tarihçe** — 1950–2026 herhangi bir sezonun şampiyonları + kim nerede kazandı tablosu
-- **Bingo** — WC olay kartları (tıkla işaretle, tarayıcıda saklanır)
+- **Tracks** — F1-style 3-column track cards (click a card for round detail)
+- **Drivers' / Constructors' Championship** — real points, last race on the left, full table with position arrows (▲▼) on the right
+- **Grid / Race** — starting grid → race result matrix with AVG Q / AVG R columns
+- **Position Gain (PG)** — grid − finish; **PGNN** counts negatives as 0
+- **Position Gaining Championship (PGC)** — top 10 gainers per event score 25-18-15…; ties split slot points
+- **Position Gaining No Split (PGNS)** — straight positional points, no split
+- **Reverse Championship** — classified finishers scored back-to-front (last gets 25), no DNFs
+- **History** — champions of any season 1950–2026 + who-won-where table
+- **Bingo** — WC event cards (click to mark, stored in browser)
 
-## Veri ve görseller
+One **Position Gain** tab hosts PG / PGNN / PGC / PGNS via the championship selector up top.
 
-- Veri: [Jolpica F1 API](https://api.jolpi.ca/ergast/f1/) (canlı takvim + sonuçlar)
-- Pilot/araç/pist görselleri ve fontlar: © Formula One (`media.formula1.com`, hotlink, 2026 sezonu)
-- Eski sezon görselleri: Wikipedia makale görselleri (pilot portresi, pist haritası, takım görseli)
-- Takım renkleri: OpenF1 `team_colour`
+## Data & images
 
-## Çalıştırma
+- Data: [Jolpica F1 API](https://api.jolpi.ca/ergast/f1/) (live calendar + results, incl. sprints)
+- Images & fonts: © Formula One (`media.formula1.com`, hotlink, 2026 season)
+- Older seasons: Wikipedia article images (driver portraits, race photos, team logos)
+- Team colours: OpenF1 `team_colour`
+
+## Run locally
 
 ```bash
 python -m http.server 8000
 # http://localhost:8000
 ```
 
-## Notlar
+## Notes
 
-- PL ile başlayanlar kazanç hesabında en arkadan sayılır.
-- Sprint puanları v1'de yok (sadece pazar yarışları).
-- Fotoğraflar 2026 kadrosuna aittir; eski sezonlarda Wikipedia görselleri gösterilir.
+- Pit-lane starters count from the back in gain math.
+- Sprint events award 8-7-…-1 in PGC/PGNS/Reverse (25-scale for GPs).
+- Lapped cars (`+N Laps`) count as classified in old seasons.
 
 ---
 
-Bu site **OpenCode (Muse Spark)** ile birlikte geliştirildi — Eren'in Excel konseptinden canlı F1 sitesine. 🤖
+Built together with **OpenCode (Muse Spark)** — from Eren's Excel concept to a live F1 site. 🤖
