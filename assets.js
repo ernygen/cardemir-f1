@@ -73,6 +73,64 @@ export function teamColor(constructorId) {
   return (TEAM_META[constructorId] || {}).color || "#e10600";
 }
 
+// Eski sezon görselleri: Ergast'ın verdiği Wikipedia linkinden küçük resim.
+// (Pilot portresi, pist haritası, takım görseli — ne varsa makalenin ana görseli.)
+const wikiCache = new Map(); // title -> Promise<string|null>
+
+export function wikiTitle(url) {
+  if (!url) return null;
+  const m = String(url).match(/wikipedia\.org\/wiki\/([^#?]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function fetchWikiThumb(title) {
+  if (wikiCache.has(title)) return wikiCache.get(title);
+  const p = (async () => {
+    try {
+      const api = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=400&redirects=1&origin=*&titles=${encodeURIComponent(title)}`;
+      const res = await fetch(api);
+      if (!res.ok) return null;
+      const json = await res.json();
+      const pages = (json.query && json.query.pages) || {};
+      for (const k of Object.keys(pages)) {
+        const th = pages[k].thumbnail;
+        if (th && th.source) return th.source;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  })();
+  wikiCache.set(title, p);
+  return p;
+}
+
+export function wikiImg(url, cls, alt = "") {
+  const t = wikiTitle(url);
+  if (!t) return "";
+  return `<img data-wiki="${encodeURIComponent(t)}" class="${cls} wiload" alt="${String(alt).replace(/"/g, "")}" loading="lazy" />`;
+}
+
+// render sonrası çağır: bekleyen img[data-wiki] kutularını doldurur (bulunamazsa gizler)
+export async function hydrateWiki(root) {
+  const imgs = [...(root || document).querySelectorAll("img[data-wiki]")];
+  if (!imgs.length) return;
+  const byTitle = new Map();
+  for (const im of imgs) {
+    const t = decodeURIComponent(im.dataset.wiki);
+    if (!byTitle.has(t)) byTitle.set(t, []);
+    byTitle.get(t).push(im);
+  }
+  await Promise.all([...byTitle.entries()].map(async ([t, list]) => {
+    const src = await fetchWikiThumb(t);
+    for (const im of list) {
+      if (!im.isConnected) continue;
+      if (src) { im.src = src; im.classList.remove("wiload"); }
+      else im.remove();
+    }
+  }));
+}
+
 // <img> hata verirse sessizce gizle (foto yoksa tablo bozulmasın)
 export function imgTag(src, alt, cls) {
   if (!src) return "";

@@ -20,7 +20,8 @@ Excel (`F126.xlsx`) sadece konsepttir — veri alınmaz.
 ## Veri ve görseller
 
 - Veri: [Jolpica F1 API](https://api.jolpi.ca/ergast/f1/) (canlı takvim + sonuçlar)
-- Pilot/araç/pist görselleri ve fontlar: © Formula One (`media.formula1.com`, hotlink)
+- Pilot/araç/pist görselleri ve fontlar: © Formula One (`media.formula1.com`, hotlink, 2026 sezonu)
+- Eski sezon görselleri: Wikipedia makale görselleri (pilot portresi, pist haritası, takım görseli)
 - Takım renkleri: OpenF1 `team_colour`
 
 ## Çalıştırma
@@ -34,7 +35,7 @@ python -m http.server 8000
 
 - PL ile başlayanlar kazanç hesabında en arkadan sayılır.
 - Sprint puanları v1'de yok (sadece pazar yarışları).
-- Fotoğraflar 2026 kadrosuna aittir, eski sezonlarda gösterilmez.
+- Fotoğraflar 2026 kadrosuna aittir; eski sezonlarda Wikipedia görselleri gösterilir.
 
 ---
 

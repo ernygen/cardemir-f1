@@ -89,6 +89,7 @@ function computeRound(roundNo, name, date, rows, sprint = false) {
     classified.push({
       id: r.Driver.driverId, code: code(r), name: fullName(r),
       team: r.Constructor.name, teamId: r.Constructor.constructorId,
+      wiki: r.Driver.url || null,
       grid: effGrid, gridRaw: String(r.grid), finish: pos, status: r.status,
       realPoints: pts(r.points), classified: ok,
       gain: ok ? effGrid - pos : null,
@@ -126,7 +127,7 @@ export async function loadSeason(year) {
   const schedJson = await fetchJson(`/${year}.json`);
   const schedule = (schedJson.MRData.RaceTable.Races || []).map((r) => ({
     round: Number(r.round), name: r.raceName, date: r.date,
-    circuit: r.Circuit.circuitName, circuitId: r.Circuit.circuitId,
+    circuit: r.Circuit.circuitName, circuitId: r.Circuit.circuitId, wiki: r.Circuit.url || null,
   }));
   const [resRows, sprintRows] = await Promise.all([
     fetchAllRows(`/${year}/results.json`),
@@ -141,6 +142,11 @@ export async function loadSeason(year) {
     return m;
   };
   const schedByRound = new Map(schedule.map((s) => [s.round, s]));
+  // Takım Wikipedia linkleri (eski sezon görselleri için)
+  const teamWiki = {};
+  for (const { row } of [...resRows, ...sprintRows]) {
+    if (row.Constructor && row.Constructor.url) teamWiki[row.Constructor.constructorId] = row.Constructor.url;
+  }
   const sprintSet = new Set();
   const rounds = [...group(resRows).entries()]
     .sort((a, b) => a[0] - b[0])
@@ -196,7 +202,7 @@ export async function loadSeason(year) {
     }
   }
   return {
-    source: `f1api:${year}`, season: year, schedule, rounds, sprints, events,
+    source: `f1api:${year}`, season: year, schedule, rounds, sprints, events, teamWiki,
     sprintRounds: [...sprintSet].sort((a, b) => a - b),
     completed: rounds.length,
     drivers: [...drivers.values()], teams: [...teams.values()],
@@ -217,10 +223,11 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
     if (rd.seq > upto) continue;
     for (const d of rd.drivers) {
       if (!agg.has(d.id)) {
-        agg.set(d.id, { id: d.id, code: d.code, name: d.name, team: d.team, teamId: d.teamId, value: 0, wins: 0, swins: 0 });
+        agg.set(d.id, { id: d.id, code: d.code, name: d.name, team: d.team, teamId: d.teamId, wiki: d.wiki || null, value: 0, wins: 0, swins: 0 });
       }
       const a = agg.get(d.id);
       a.team = d.team; a.teamId = d.teamId;
+      if (!a.wiki && d.wiki) a.wiki = d.wiki;
       if (metric === "real") { a.value += d.realPoints; if (d.finish === 1) { if (rd.sprint) a.swins++; else a.wins++; } }
       else if (metric === "pg") { if (d.gain !== null) a.value += d.gain; }
       else if (metric === "pgnn") { if (d.gain !== null) a.value += Math.max(0, d.gain); }

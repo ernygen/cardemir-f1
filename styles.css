@@ -45,6 +45,10 @@ tbody tr:hover { background:#faf7f4; }
 .who { display:flex; align-items:center; gap:10px; }
 .tbar { display:inline-block; width:5px; align-self:stretch; min-height:30px; border-radius:2px; margin-right:2px; }
 .dphoto { width:64px; height:40px; object-fit:cover; object-position:top; border-radius:6px; background:#ece7e1; }
+.dphoto.sm { width:46px; height:32px; }
+img.wiload { background:#ece7e1; }
+img.wiload:not([src]) { visibility:hidden; }
+.trackimg { width:100%; height:100%; object-fit:cover; display:block; }
 .carphoto { width:110px; height:44px; object-fit:cover; border-radius:6px; background:#ece7e1; }
 .logo { width:56px; height:32px; object-fit:contain; border-radius:6px; background:#fff; border:1px solid var(--line); padding:3px 6px; }
 .cardlogo { width:84px; height:48px; object-fit:contain; border-radius:8px; background:#fff; border:1px solid var(--line); padding:5px 10px; }

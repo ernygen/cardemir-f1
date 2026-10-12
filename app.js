@@ -1,6 +1,6 @@
 import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js";
 import * as api from "./providers/f1ApiProvider.js";
-import { driverPhoto, teamCarPhoto, teamLogo, trackCardPhoto, teamColor, imgTag } from "./assets.js";
+import { driverPhoto, teamCarPhoto, teamLogo, trackCardPhoto, teamColor, imgTag, wikiImg, hydrateWiki } from "./assets.js";
 
 // Fotoğraflar sadece 2026 sezonu için (formula1.com 2026 kadrosu)
 const PHOTOS = () => S.season === "2026";
@@ -107,10 +107,23 @@ function avgQF(d, id) {
   return [a(gS, gN), a(fS, fN)];
 }
 
-// Sonuç tablolarında 3 harf kod yerine takım logosu (+ isim)
+// Pilot fotosu: 2026'da F1 CDN, eski sezonlarda Wikipedia
+const photoFor = (x, cls) => PHOTOS() ? imgTag(driverPhoto(x.code), x.name, cls) : wikiImg(x.wiki, cls, x.name);
+// Takım görseli: 2026'da F1 CDN (logo/araba), eskilerde Wikipedia
+const teamImgFor = (d, id, name, cls, kind) => {
+  if (PHOTOS()) return imgTag(kind === "car" ? teamCarPhoto(id) : teamLogo(id), name, cls);
+  return wikiImg(d.teamWiki && d.teamWiki[id], cls, name);
+};
+
+// Sonuç tablolarında görsel: 2026'da takım logosu, eskilerde pilot fotosu (+ isim)
 function drvResult(x) {
-  const logo = PHOTOS() ? imgTag(teamLogo(x.teamId), x.name, "logo sm") : "";
-  if (logo) return `<span class="who">${logo}<span>${esc(x.name)}</span></span>`;
+  if (PHOTOS()) {
+    const logo = imgTag(teamLogo(x.teamId), x.name, "logo sm");
+    if (logo) return `<span class="who">${logo}<span>${esc(x.name)}</span></span>`;
+  } else {
+    const ph = wikiImg(x.wiki, "dphoto sm", x.name);
+    if (ph) return `<span class="who">${ph}<span>${esc(x.name)}</span></span>`;
+  }
   return `<b>${esc(x.code)}</b> ${esc(x.name)}`;
 }
 function deltaCell(x) {
@@ -148,7 +161,7 @@ function render() {
     const cards = d.schedule.filter((s) => matchQ(s.name, s.circuit)).map((s) => {
       const rd = d.rounds.find((r) => r.round === s.round);
       const sp = d.sprints.find((r) => r.round === s.round);
-      const img = S.season === "2026" ? imgTag(trackCardPhoto(s.circuitId), s.name, "trackimg") : "";
+      const img = S.season === "2026" ? imgTag(trackCardPhoto(s.circuitId), s.name, "trackimg") : wikiImg(s.wiki, "trackimg", s.name);
       const win = rd && rd.winner
         ? `<div class="twin">🏆 ${PHOTOS() ? imgTag(teamLogo(rd.winner.teamId), rd.winner.name, "logo sm") : `<b>${esc(rd.winner.code)}</b>`} <span>${esc(rd.winner.name)}</span></div>`
         : `<div class="twin mut">⏳ ${esc(s.date)}</div>`;
@@ -176,16 +189,16 @@ function render() {
           `<tr><td class="pos ${medalClass(x.finish)}">P${x.finish}</td><td>${drvResult(x)}</td><td class="pts">${fmtPts(x.realPoints)}</td></tr>`));
       } else {
         left = table(["Takım", "Puan"], lastRoundTeams(last).map((t, i) =>
-          `<tr><td class="${medalClass(i + 1)}"><span class="who">${PHOTOS() ? imgTag(teamLogo(t.id), t.name, "logo") : ""}${esc(t.name)}</span></td><td class="pts">${fmtPts(t.v)}</td></tr>`));
+          `<tr><td class="${medalClass(i + 1)}"><span class="who">${teamImgFor(d, t.id, t.name, "logo", "logo")}${esc(t.name)}</span></td><td class="pts">${fmtPts(t.v)}</td></tr>`));
       }
-      const right = table(isD ? ["#", "Δ", "Pilot", "Takım", "G", "SW", "Puan"] : ["#", "Δ", "Takım", "G", "Puan"],
+      const right = table(isD ? ["#", "Δ", "Pilot", "Takım", "G"].concat(rows.some((x) => x.swins) ? ["SW"] : []).concat(["Puan"]) : ["#", "Δ", "Takım", "G", "Puan"],
         rows.map((x) => {
           const bar = `<span class="tbar" style="background:${teamColor(isD ? x.teamId : x.id)}"></span>`;
           if (isD) {
-            const ph = PHOTOS() ? imgTag(driverPhoto(x.code), x.name, "dphoto") : "";
-            return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td><td>${x.swins || ""}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
+            const ph = photoFor(x, "dphoto");
+            return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td>${x.swins ? `<td>${x.swins}</td>` : (rows.some((y) => y.swins) ? "<td></td>" : "")}<td class="pts">${fmtPts(x.value)}</td></tr>`;
           }
-          const logo = PHOTOS() ? imgTag(teamLogo(x.id), x.name, "logo") : "";
+          const logo = teamImgFor(d, x.id, x.name, "logo", "logo");
           const car = PHOTOS() ? imgTag(teamCarPhoto(x.id), x.name, "carphoto") : "";
           return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${logo}${car}<span>${bar}${esc(x.name)}</span></span></td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
         }));
@@ -193,14 +206,15 @@ function render() {
       stat = `${rows.length} ${isD ? "pilot" : "takım"} • oklar bir önceki tura göre`;
     } else {
       const rows = api.computeTable(d, opts).filter((x) => matchQ(x.name, x.code || ""));
-      html = table(isD ? ["#", "Pilot", "Takım", "Galibiyet", "SW", "Puan"] : ["#", "Takım", "Galibiyet", "Puan"],
+      const hasSw2 = rows.some((x) => x.swins);
+      html = table(isD ? ["#", "Pilot", "Takım", "Galibiyet"].concat(hasSw2 ? ["SW"] : []).concat(["Puan"]) : ["#", "Takım", "Galibiyet", "Puan"],
         rows.map((x, i) => {
           const bar = `<span class="tbar" style="background:${teamColor(isD ? x.teamId : x.id)}"></span>`;
           if (isD) {
-            const ph = PHOTOS() ? imgTag(driverPhoto(x.code), x.name, "dphoto") : "";
-            return `<tr><td class="pos">${i + 1}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td><td>${x.swins || ""}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
+            const ph = photoFor(x, "dphoto");
+            return `<tr><td class="pos">${i + 1}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td>${hasSw2 ? `<td>${x.swins || ""}</td>` : ""}<td class="pts">${fmtPts(x.value)}</td></tr>`;
           }
-          const logo = PHOTOS() ? imgTag(teamLogo(x.id), x.name, "logo") : "";
+          const logo = teamImgFor(d, x.id, x.name, "logo", "logo");
           return `<tr><td class="pos">${i + 1}</td><td><span class="who">${logo}<span>${bar}${esc(x.name)}</span></span></td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
         }));
       stat = `${rows.length} ${isD ? "pilot" : "takım"}`;
@@ -329,10 +343,10 @@ function render() {
     }
   } else if (S.tab === "history") {
     const c = api.getChampions(d);
-    const dph = PHOTOS() && c.driver ? imgTag(driverPhoto(c.driver.code), c.driver.name, "cardphoto") : "";
+    const dph = c.driver ? photoFor(c.driver, "cardphoto") : "";
     const dcol = c.driver ? teamColor(c.driver.teamId) : "#e10600";
     const tcol = c.team ? teamColor(c.team.id) : "#e10600";
-    const tlogo = PHOTOS() && c.team ? imgTag(teamLogo(c.team.id), c.team.name, "cardlogo") : "";
+    const tlogo = c.team ? teamImgFor(d, c.team.id, c.team.name, "cardlogo", "logo") : "";
     html = `<div class="cards">
       <div class="card" style="border-top-color:${dcol}"><div class="ct">Pilot Şampiyonu</div><div class="cb">${dph}<span><b>${c.driver ? esc(c.driver.code) : "—"}</b> ${c.driver ? esc(c.driver.name) : ""}</span></div><div class="cm">${c.driver ? fmtPts(c.driver.value) + " puan • " + c.driver.wins + " galibiyet" : ""}</div></div>
       <div class="card" style="border-top-color:${tcol}"><div class="ct">Takım Şampiyonu</div><div class="cb">${tlogo}<b>${c.team ? esc(c.team.name) : "—"}</b></div><div class="cm">${c.team ? fmtPts(c.team.value) + " puan • " + c.team.wins + " galibiyet" : ""}</div></div>
@@ -349,6 +363,7 @@ function render() {
   $("content").innerHTML = html;
   $("statLine").textContent = stat;
   if (S.tab === "bingo") initBingo();
+  hydrateWiki($("content"));
   const tg = document.querySelector("#content .trackgrid");
   if (tg) tg.onclick = (e) => {
     const c = e.target.closest(".tcard");
