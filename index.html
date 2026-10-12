@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>F126 — Excel'den Beslenen F1 Sitesi (API'ye Hazır)</title>
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<header>
+  <div class="logo">🏁 F126 <span id="sourceBadge" title="Veri kaynağı">EXCEL</span></div>
+  <div class="tabs">
+    <button id="tabDrivers" class="active">Pilotlar</button>
+    <button id="tabTeams">Takımlar</button>
+  </div>
+</header>
+
+<main>
+  <section class="controls">
+    <input id="search" type="search" placeholder="Pilot / takım ara..." />
+    <select id="raceFilter"><option value="">Tüm sezon (toplam puan)</option></select>
+    <button id="refresh" title="data.json'u tekrar yükle">↻ Yenile</button>
+  </section>
+
+  <section class="meta">
+    <span id="statLine">yükleniyor...</span>
+    <span id="updated"></span>
+  </section>
+
+  <section>
+    <table>
+      <thead><tr id="headRow"></tr></thead>
+      <tbody id="bodyRows"></tbody>
+    </table>
+  </section>
+
+  <details class="how">
+    <summary>Nasıl çalışıyor? Excel → site → F1 API geçişi</summary>
+    <ol>
+      <li><b>Şimdi:</b> <code>python excel_to_json.py</code> komutu <code>F126.xlsx</code> dosyasını okuyup <code>data.json</code> üretir. Site sadece bu JSON'u okur.</li>
+      <li>Excel güncellenince scripti tekrar çalıştır + sayfayı yenile. Bu kadar.</li>
+      <li><b>Yarın:</b> <code>config.js</code> içinde <code>DATA_SOURCE = "f1api"</code> yap. <code>providers/f1ApiProvider.js</code> içindeki örnek Jolpica kodunu aç. Arayüz kodu değişmez.</li>
+    </ol>
+    <p class="warn">Not: Drivers/Teams sheet'lerinde sadece ilk blok okunur (ilk boş satıra kadar). Altaki kümülatif/motor blokları bilerek atlanır.</p>
+  </details>
+</main>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
