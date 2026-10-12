@@ -1,5 +1,9 @@
 import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js";
 import * as api from "./providers/f1ApiProvider.js";
+import { driverPhoto, teamCarPhoto, teamColor, imgTag } from "./assets.js";
+
+// Fotoğraflar sadece 2026 sezonu için (formula1.com 2026 kadrosu)
+const PHOTOS = () => S.season === "2026";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
@@ -93,9 +97,15 @@ function render() {
     const isD = S.tab === "drivers";
     const rows = (isD ? api.getDriverStandings(d) : api.getTeamStandings(d)).filter((x) => matchQ(x.name, x.code || ""));
     html = table(isD ? ["#", "Pilot", "Takım", "Galibiyet", "Puan"] : ["#", "Takım", "Galibiyet", "Puan"],
-      rows.map((x, i) => isD
-        ? `<tr><td class="pos">${i + 1}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td>${esc(x.team)}</td><td>${x.wins}</td><td class="pts">${fmtPts(x.points)}</td></tr>`
-        : `<tr><td class="pos">${i + 1}</td><td>${esc(x.name)}</td><td>${x.wins}</td><td class="pts">${fmtPts(x.points)}</td></tr>`));
+      rows.map((x, i) => {
+        const bar = `<span class="tbar" style="background:${teamColor(isD ? x.teamId : x.id)}"></span>`;
+        if (isD) {
+          const ph = PHOTOS() ? imgTag(driverPhoto(x.code), x.name, "dphoto") : "";
+          return `<tr><td class="pos">${i + 1}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td><td class="pts">${fmtPts(x.points)}</td></tr>`;
+        }
+        const car = PHOTOS() ? imgTag(teamCarPhoto(x.id), x.name, "carphoto") : "";
+        return `<tr><td class="pos">${i + 1}</td><td><span class="who">${car}<span>${bar}${esc(x.name)}</span></span></td><td>${x.wins}</td><td class="pts">${fmtPts(x.points)}</td></tr>`;
+      }));
     stat = `${rows.length} ${isD ? "pilot" : "takım"}`;
   } else if (S.tab === "qr") {
     const list = R ? R.drivers.filter((x) => matchQ(x.name, x.code, x.team)) : [];
@@ -147,9 +157,12 @@ function render() {
     }
   } else if (S.tab === "history") {
     const c = api.getChampions(d);
+    const dph = PHOTOS() && c.driver ? imgTag(driverPhoto(c.driver.code), c.driver.name, "cardphoto") : "";
+    const dcol = c.driver ? teamColor(c.driver.teamId) : "#e10600";
+    const tcol = c.team ? teamColor(c.team.id) : "#e10600";
     html = `<div class="cards">
-      <div class="card"><div class="ct">Pilot Şampiyonu</div><div class="cb"><b>${c.driver ? esc(c.driver.code) : "—"}</b> ${c.driver ? esc(c.driver.name) : ""}</div><div class="cm">${c.driver ? fmtPts(c.driver.points) + " puan • " + c.driver.wins + " galibiyet" : ""}</div></div>
-      <div class="card"><div class="ct">Takım Şampiyonu</div><div class="cb"><b>${c.team ? esc(c.team.name) : "—"}</b></div><div class="cm">${c.team ? fmtPts(c.team.points) + " puan • " + c.team.wins + " galibiyet" : ""}</div></div>
+      <div class="card" style="border-top-color:${dcol}"><div class="ct">Pilot Şampiyonu</div><div class="cb">${dph}<span><b>${c.driver ? esc(c.driver.code) : "—"}</b> ${c.driver ? esc(c.driver.name) : ""}</span></div><div class="cm">${c.driver ? fmtPts(c.driver.points) + " puan • " + c.driver.wins + " galibiyet" : ""}</div></div>
+      <div class="card" style="border-top-color:${tcol}"><div class="ct">Takım Şampiyonu</div><div class="cb"><b>${c.team ? esc(c.team.name) : "—"}</b></div><div class="cm">${c.team ? fmtPts(c.team.points) + " puan • " + c.team.wins + " galibiyet" : ""}</div></div>
       <div class="card"><div class="ct">Sezon</div><div class="cb"><b>${esc(S.season)}</b></div><div class="cm">${c.rounds} tur • ${c.differentWinners} farklı kazanan</div></div>
     </div>`;
     stat = `${S.season} sezonu özeti`;
