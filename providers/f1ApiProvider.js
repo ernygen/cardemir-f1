@@ -175,19 +175,79 @@ export async function loadSeasonsList() {
   return json.MRData.SeasonTable.Seasons.map((s) => s.season);
 }
 
-const by = (k) => (a, b) => b[k] - a[k];
-export const getDriverStandings = (d) => [...d.drivers].sort((a, b) => b.points - a.points || b.wins - a.wins);
-export const getTeamStandings = (d) => [...d.teams].sort((a, b) => b.points - a.points || b.wins - a.wins);
-export const getPG = (d, nn = false) => [...d.drivers].sort(by(nn ? "pgnn" : "pg"));
-export const getPGC = (d, split = true) => [...d.drivers].sort(by(split ? "pgc" : "pgns"));
-export const getTers = (d) => [...d.drivers].sort(by("ters"));
-export const getTeamPGC = (d, split = true) => [...d.teams].sort(by(split ? "pgc" : "pgns"));
-export const getTeamTers = (d) => [...d.teams].sort(by("ters"));
+// Belirli bir tura kadar kümülatif tablo. metric: real|pg|pgnn|pgc|ters
+// (pgns = metric pgc + split:false). upto: dahil olan son tur no (Infinity = tümü).
+export function computeTable(data, { who = "drivers", metric = "real", upto = Infinity, split = true } = {}) {
+  const agg = new Map();
+  for (const rd of data.rounds) {
+    if (rd.round > upto) continue;
+    for (const d of rd.drivers) {
+      if (!agg.has(d.id)) {
+        agg.set(d.id, { id: d.id, code: d.code, name: d.name, team: d.team, teamId: d.teamId, value: 0, wins: 0 });
+      }
+      const a = agg.get(d.id);
+      a.team = d.team; a.teamId = d.teamId;
+      if (metric === "real") { a.value += d.realPoints; if (d.finish === 1) a.wins++; }
+      else if (metric === "pg") { if (d.gain !== null) a.value += d.gain; }
+      else if (metric === "pgnn") { if (d.gain !== null) a.value += Math.max(0, d.gain); }
+      else if (metric === "pgc") { a.value += (split ? rd.pgcSplit : rd.pgns).get(d.id) || 0; }
+      else if (metric === "ters") { a.value += rd.ters.get(d.id) || 0; }
+    }
+  }
+  let arr = [...agg.values()];
+  if (metric === "real") arr.sort((a, b) => b.value - a.value || b.wins - a.wins);
+  else arr.sort((a, b) => b.value - a.value);
+  if (who === "teams") {
+    // Takımlar: turun atandığı takıma yazılır (sezon içi takım değiştiren pilotun
+    // eski puanı eski takımda kalır — örn. Lawson'un Red Bull puanları).
+    const t = new Map();
+    const add = (teamId, name, v, win) => {
+      if (!t.has(teamId)) t.set(teamId, { id: teamId, name, value: 0, wins: 0 });
+      const T = t.get(teamId);
+      T.name = name; T.value += v; T.wins += win ? 1 : 0;
+    };
+    for (const rd of data.rounds) {
+      if (rd.round > upto) continue;
+      for (const d of rd.drivers) {
+        if (metric === "real") add(d.teamId, d.team, d.realPoints, d.finish === 1);
+        else if (metric === "pg" && d.gain !== null) add(d.teamId, d.team, d.gain, false);
+        else if (metric === "pgnn" && d.gain !== null) add(d.teamId, d.team, Math.max(0, d.gain), false);
+        else if (metric === "pgc") add(d.teamId, d.team, (split ? rd.pgcSplit : rd.pgns).get(d.id) || 0, false);
+        else if (metric === "ters") add(d.teamId, d.team, rd.ters.get(d.id) || 0, false);
+      }
+    }
+    arr = [...t.values()].sort((a, b) => b.value - a.value || b.wins - a.wins);
+  }
+  return arr;
+}
+
+// Sezon toplamı + bir önceki tura göre sıra farkı (oklar için).
+// Dönüş: [{..., rank, prev (sıra no / null=yeni), diff}]
+export function tableWithChanges(data, opts) {
+  const full = computeTable(data, opts);
+  const n = data.rounds.length;
+  if (n < 2) return full.map((x, i) => ({ ...x, rank: i + 1, prev: null, diff: null }));
+  const prevRound = data.rounds[n - 2].round;
+  const before = computeTable(data, { ...opts, upto: prevRound });
+  const rb = new Map(before.map((x, i) => [x.id, i + 1]));
+  return full.map((x, i) => {
+    const p = rb.has(x.id) ? rb.get(x.id) : null;
+    return { ...x, rank: i + 1, prev: p, diff: p === null ? null : p - (i + 1) };
+  });
+}
+
+export const getDriverStandings = (d) => computeTable(d, { who: "drivers", metric: "real" });
+export const getTeamStandings = (d) => computeTable(d, { who: "teams", metric: "real" });
+export const getPG = (d, nn = false) => computeTable(d, { who: "drivers", metric: nn ? "pgnn" : "pg" });
+export const getPGC = (d, split = true) => computeTable(d, { who: "drivers", metric: "pgc", split });
+export const getTers = (d) => computeTable(d, { who: "drivers", metric: "ters" });
+export const getTeamPGC = (d, split = true) => computeTable(d, { who: "teams", metric: "pgc", split });
+export const getTeamTers = (d) => computeTable(d, { who: "teams", metric: "ters" });
 export const getRound = (d, round) => d.rounds.find((r) => r.round === Number(round));
 
 export function getChampions(data) {
-  const dw = getDriverStandings(data)[0];
-  const cw = getTeamStandings(data)[0];
+  const dw = computeTable(data, { who: "drivers", metric: "real" })[0];
+  const cw = computeTable(data, { who: "teams", metric: "real" })[0];
   const winners = new Set(data.rounds.map((r) => r.winner && r.winner.id).filter(Boolean));
   return { driver: dw, team: cw, rounds: data.rounds.length, differentWinners: winners.size };
 }

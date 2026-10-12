@@ -46,6 +46,12 @@ export function teamCarPhoto(constructorId) {
   return `${IMG}/c_lfill,w_320/q_auto/d_common:f1:2026:fallback:car:2026fallbackcarright.webp/${VER}/common/f1/2026/${m.slug}/2026${m.slug}carright.webp`;
 }
 
+export function teamLogo(constructorId) {
+  const m = TEAM_META[constructorId];
+  if (!m) return null;
+  return `${IMG}/c_lfill,w_200/q_auto/${VER}/common/f1/2026/${m.slug}/2026${m.slug}logo.webp`;
+}
+
 export function teamColor(constructorId) {
   return (TEAM_META[constructorId] || {}).color || "#e10600";
 }
