@@ -7,7 +7,7 @@ const PHOTOS = () => S.season === "2026";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
-  ["cal", "Yarış Takvimi"], ["tracks", "Pistler"], ["drivers", "Pilotlar Şampiyonası"], ["teams", "Takımlar Şampiyonası"],
+  ["tracks", "Pistler"], ["drivers", "Pilotlar Şampiyonası"], ["teams", "Takımlar Şampiyonası"],
   ["qr", "Grid / Yarış"], ["pg", "Position Gain"], ["pgnn", "Position Gain No Negative"],
   ["pgc", "Position Gaining Championship"], ["pgns", "Position Gaining No Split"], ["ters", "Ters Şampiyona"],
   ["history", "Tarihçe"], ["bingo", "Bingo"],
@@ -80,7 +80,17 @@ function table(head, rows) {
   return `<table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("") || `<tr><td colspan="${head.length}">Sonuç yok</td></tr>`}</tbody></table>`;
 }
 
-// Sıra değişim oku: diff = önceki sıra - yeni sıra
+// Yarış sonucu ilk 3: altın-gümüş-bronz (finish sırasına göre)
+function medalClass(finish) {
+  return finish === 1 ? "m1" : finish === 2 ? "m2" : finish === 3 ? "m3" : "";
+}
+
+// Sonuç tablolarında 3 harf kod yerine takım logosu (+ isim)
+function drvResult(x) {
+  const logo = PHOTOS() ? imgTag(teamLogo(x.teamId), x.name, "logo sm") : "";
+  if (logo) return `<span class="who">${logo}<span>${esc(x.name)}</span></span>`;
+  return `<b>${esc(x.code)}</b> ${esc(x.name)}`;
+}
 function deltaCell(x) {
   if (x.diff === null || x.diff === undefined) return `<span class="newtag">YENİ</span>`;
   if (x.diff > 0) return `<span class="up">▲${x.diff}</span>`;
@@ -112,20 +122,12 @@ function render() {
   const R = S.round ? api.getRound(d, S.round) : null;
   let html = "", stat = "";
 
-  if (S.tab === "cal") {
-    const done = new Set(d.rounds.map((r) => r.round));
-    html = table(["#", "Yarış", "Tarih", "Pist", "Kazanan"],
-      d.schedule.map((s) => {
-        const rd = d.rounds.find((r) => r.round === s.round);
-        return `<tr><td class="pos">R${s.round}</td><td>${esc(s.name)}</td><td>${esc(s.date)}</td><td>${esc(s.circuit)}</td><td>${rd && rd.winner ? `<b>${esc(rd.winner.code)}</b> <span class="mut">${esc(rd.winner.team)}</span>` : "<span class='mut'>—</span>"}</td></tr>`;
-      }));
-    stat = `${d.schedule.length} yarış • ${done.size} tamamlandı`;
-  } else if (S.tab === "tracks") {
+  if (S.tab === "tracks") {
     const cards = d.schedule.filter((s) => matchQ(s.name, s.circuit)).map((s) => {
       const rd = d.rounds.find((r) => r.round === s.round);
       const img = S.season === "2026" ? imgTag(trackCardPhoto(s.circuitId), s.name, "trackimg") : "";
       const win = rd && rd.winner
-        ? `<div class="twin">🏆 <b>${esc(rd.winner.code)}</b> <span class="mut">${esc(rd.winner.team)}</span></div>`
+        ? `<div class="twin">🏆 ${PHOTOS() ? imgTag(teamLogo(rd.winner.teamId), rd.winner.name, "logo sm") : `<b>${esc(rd.winner.code)}</b>`} <span>${esc(rd.winner.name)}</span></div>`
         : `<div class="twin mut">⏳ ${esc(s.date)}</div>`;
       return `<div class="tcard" data-round="${s.round}">
         <div class="timg">${img}<span class="tround">R${s.round}</span></div>
@@ -145,10 +147,10 @@ function render() {
       if (isD) {
         const top = [...last.drivers].filter((x) => x.classified).sort((a, b) => a.finish - b.finish).slice(0, 10);
         left = table(["Finiş", "Pilot", "Puan"], top.map((x) =>
-          `<tr><td class="pos">P${x.finish}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td class="pts">${fmtPts(x.realPoints)}</td></tr>`));
+          `<tr><td class="pos ${medalClass(x.finish)}">P${x.finish}</td><td>${drvResult(x)}</td><td class="pts">${fmtPts(x.realPoints)}</td></tr>`));
       } else {
-        left = table(["Takım", "Puan"], lastRoundTeams(last).map((t) =>
-          `<tr><td><span class="who">${PHOTOS() ? imgTag(teamLogo(t.id), t.name, "logo") : ""}${esc(t.name)}</span></td><td class="pts">${fmtPts(t.v)}</td></tr>`));
+        left = table(["Takım", "Puan"], lastRoundTeams(last).map((t, i) =>
+          `<tr><td class="${medalClass(i + 1)}"><span class="who">${PHOTOS() ? imgTag(teamLogo(t.id), t.name, "logo") : ""}${esc(t.name)}</span></td><td class="pts">${fmtPts(t.v)}</td></tr>`));
       }
       const right = table(isD ? ["#", "Δ", "Pilot", "Takım", "G", "Puan"] : ["#", "Δ", "Takım", "G", "Puan"],
         rows.map((x) => {
@@ -181,7 +183,7 @@ function render() {
     const list = R ? R.drivers.filter((x) => matchQ(x.name, x.code, x.team)) : [];
     html = table(["Grid", "Pilot", "Finiş", "Kazanç", "Durum"],
       [...list].sort((a, b) => (a.grid - b.grid)).map((x) =>
-        `<tr><td class="pos">${x.grid}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td>${x.finish ?? "–"}</td><td class="pts">${x.gain === null ? "–" : (x.gain > 0 ? "+" : "") + x.gain}</td><td class="mut">${esc(x.status)}</td></tr>`));
+        `<tr><td class="pos">${x.grid}</td><td>${drvResult(x)}</td><td class="${medalClass(x.finish)}">${x.finish === null || x.finish === undefined ? "–" : "P" + x.finish}</td><td class="pts">${x.gain === null ? "–" : (x.gain > 0 ? "+" : "") + x.gain}</td><td class="mut">${esc(x.status)}</td></tr>`));
     stat = R ? `${R.name} • ${list.length} pilot` : "Tur seç";
   } else if (S.tab === "pg" || S.tab === "pgnn") {
     const nn = S.tab === "pgnn";
@@ -190,7 +192,7 @@ function render() {
     if (R) {
       const list = R.byGain.filter((x) => matchQ(x.name, x.code)).map((x) => ({ ...x, v: nn ? Math.max(0, x.gain) : x.gain }));
       html = table(["#", "Pilot", "Grid → Finiş", label],
-        list.map((x, i) => `<tr><td class="pos">${i + 1}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td>${x.grid} → ${x.finish}</td><td class="pts">${x.v > 0 ? "+" : ""}${x.v}</td></tr>`));
+        list.map((x, i) => `<tr><td class="pos">${i + 1}</td><td>${drvResult(x)}</td><td>${x.grid} → ${x.finish}</td><td class="pts">${x.v > 0 ? "+" : ""}${x.v}</td></tr>`));
       stat = `${R.name}`;
     } else if (d.rounds.length >= 2) {
       const rows = api.tableWithChanges(d, { who: "drivers", metric }).filter((x) => matchQ(x.name, x.code));
@@ -215,7 +217,7 @@ function render() {
       const map = split ? R.pgcSplit : R.pgns;
       const list = R.byGain.filter((x) => map.has(x.id) && matchQ(x.name, x.code));
       html = table(["#", "Pilot", "Kazanç", "Puan"],
-        list.map((x, i) => `<tr><td class="pos">${i + 1}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td>+${x.gain}</td><td class="pts">${fmtPts(map.get(x.id))}</td></tr>`));
+        list.map((x, i) => `<tr><td class="pos">${i + 1}</td><td>${drvResult(x)}</td><td>+${x.gain}</td><td class="pts">${fmtPts(map.get(x.id))}</td></tr>`));
       stat = `${R.name} • ${split ? "bölüşmeli" : "bölüşmesiz"}`;
     } else if (d.rounds.length >= 2) {
       const rows = api.tableWithChanges(d, { who: "drivers", metric: "pgc", split }).filter((x) => matchQ(x.name, x.code));
@@ -238,7 +240,7 @@ function render() {
       const cls = [...R.drivers].filter((x) => x.classified).sort((a, b) => b.finish - a.finish);
       const list = cls.filter((x) => R.ters.has(x.id) && matchQ(x.name, x.code));
       html = table(["Ters #", "Pilot", "Finiş", "Puan"],
-        list.map((x, i) => `<tr><td class="pos">${i + 1}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td>P${x.finish}</td><td class="pts">${fmtPts(R.ters.get(x.id))}</td></tr>`));
+        list.map((x, i) => `<tr><td class="pos">${i + 1}</td><td>${drvResult(x)}</td><td>P${x.finish}</td><td class="pts">${fmtPts(R.ters.get(x.id))}</td></tr>`));
       stat = `${R.name} • sondan başa`;
     } else if (d.rounds.length >= 2) {
       const rows = api.tableWithChanges(d, { who: "drivers", metric: "ters" }).filter((x) => matchQ(x.name, x.code));

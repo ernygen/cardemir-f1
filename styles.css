@@ -52,6 +52,10 @@ tbody tr:hover { background:#faf7f4; }
 .lastrace .ct { margin-bottom:8px; }
 .up { color:#1f7a3d; font-weight:800; white-space:nowrap; }
 .down { color:#c00; font-weight:800; white-space:nowrap; }
+.m1 { background:linear-gradient(135deg,#f6d47c,#e8b923); font-weight:900; border-radius:6px; }
+.m2 { background:linear-gradient(135deg,#e8e8ec,#b9b9c4); font-weight:900; border-radius:6px; }
+.m3 { background:linear-gradient(135deg,#e0a878,#b5713e); color:#fff; font-weight:900; border-radius:6px; }
+.logo.sm { width:44px; height:26px; }
 .newtag { background:var(--acc); color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:10px; white-space:nowrap; }
 .cardphoto { width:100%; max-height:150px; object-fit:cover; object-position:top; border-radius:8px; background:#ece7e1; margin-bottom:8px; }
 .card .cb { display:flex; align-items:center; gap:10px; }

@@ -75,7 +75,7 @@ function computeRound(roundNo, name, date, rows) {
     const grid = num(r.grid);
     const ok = isClassified(r.status) && pos !== null;
     const effGrid = grid !== null && grid > 0 ? grid : plGrid;
-    if (pos === 1) winner = { id: r.Driver.driverId, code: code(r), name: fullName(r), team: r.Constructor.name };
+    if (pos === 1) winner = { id: r.Driver.driverId, code: code(r), name: fullName(r), team: r.Constructor.name, teamId: r.Constructor.constructorId };
     classified.push({
       id: r.Driver.driverId, code: code(r), name: fullName(r),
       team: r.Constructor.name, teamId: r.Constructor.constructorId,
