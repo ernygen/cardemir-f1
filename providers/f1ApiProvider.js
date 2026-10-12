@@ -9,10 +9,19 @@ const PAGE = 100;
 export const PGC_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 const CLASSIFIED = new Set(["Finished", "Lapped"]);
 
-async function fetchJson(path) {
-  const res = await fetch(BASE + path, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
-  return res.json();
+async function fetchJson(path, timeoutMs = 25000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(BASE + path, { headers: { Accept: "application/json" }, signal: ctrl.signal });
+    if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+    return res.json();
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error(`API zaman aşımı (25sn): ${path}`);
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 // Jolpica sayfalamayı satır bazında yapar (limit max 100), turlar bölünebilir.
@@ -20,7 +29,7 @@ async function fetchJson(path) {
 async function fetchAllRows(path) {
   const rows = [];
   let offset = 0;
-  for (;;) {
+  for (let page = 0; page < 50; page++) {
     const json = await fetchJson(`${path}?limit=${PAGE}&offset=${offset}`);
     const table = json.MRData.RaceTable;
     for (const race of table.Races) {
@@ -29,7 +38,7 @@ async function fetchAllRows(path) {
     }
     const total = Number(json.MRData.total);
     offset += PAGE;
-    if (offset >= total || (table.Races.length === 0)) break;
+    if (offset >= total || table.Races.length === 0) break;
   }
   return rows;
 }

@@ -59,6 +59,9 @@ async function refresh() {
     render();
   } catch (e) {
     $("statLine").textContent = "Hata: " + e.message;
+    $("content").innerHTML = `<div class="card"><div class="cb">Yüklenemedi</div><div class="cm">İnternet/API sorunu olabilir. Sayfayı yenilemeyi dene.</div><div class="bingoBar"><button id="retry">Tekrar dene</button></div></div>`;
+    const b = $("retry");
+    if (b) b.onclick = () => { cache.delete(S.season); refresh(); };
   } finally { S.loading = false; }
 }
 
@@ -213,3 +216,9 @@ function initBingo() {
 }
 
 boot();
+
+// Beklenmedik JS hatası olursa ekranda göster (sessiz "yükleniyor" takılmasını önler)
+window.addEventListener("error", (e) => {
+  const el = document.getElementById("statLine");
+  if (el && /yükleniyor/.test(el.textContent)) el.textContent = "Hata: " + (e.message || "bilinmeyen");
+});
