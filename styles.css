@@ -23,7 +23,8 @@
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--txt); font-family:var(--body); }
 header { display:flex; justify-content:space-between; align-items:center; padding:12px 20px; background:var(--dark); color:#fff; border-top:4px solid var(--acc); position:sticky; top:0; z-index:5; }
-.logo { font-family:var(--head); font-weight:900; font-style:italic; font-size:24px; text-transform:uppercase; }
+.logo { display:flex; align-items:center; font-family:var(--head); font-weight:900; font-style:italic; font-size:24px; text-transform:uppercase; }
+.sitelogo { height:44px; width:auto; border-radius:6px; }
 .logo span { font-size:11px; font-style:normal; background:var(--acc); padding:3px 8px; border-radius:3px; vertical-align:middle; margin-left:8px; }
 .seasonbox { display:flex; align-items:center; gap:8px; color:#b0b0b8; font-size:14px; }
 .seasonbox select { background:#26262e; color:#fff; border:1px solid #3a3a44; }
