@@ -70,9 +70,9 @@ function fillRounds() {
   const show = ROUND_TABS.has(S.tab);
   sel.style.display = show ? "" : "none";
   if (!show) return;
-  const ds = S.data.rounds;
-  sel.innerHTML = `<option value="">Sezon toplamı (${ds.length} tur)</option>` +
-    ds.map((r) => `<option value="${r.round}" ${String(r.round) === S.round ? "selected" : ""}>R${r.round} — ${esc(r.name)}</option>`).join("");
+  const evs = S.data.events;
+  sel.innerHTML = `<option value="">Sezon toplamı (${evs.length} olay)</option>` +
+    evs.map((r) => `<option value="${r.key}" ${String(r.key) === S.round ? "selected" : ""}>${r.sprint ? `⚡R${r.round}S` : `R${r.round}`} — ${esc(r.name)}</option>`).join("");
   if (S.tab === "qr" && !S.round && ds.length) { sel.value = ""; }
 }
 
@@ -125,14 +125,18 @@ function render() {
   if (S.tab === "tracks") {
     const cards = d.schedule.filter((s) => matchQ(s.name, s.circuit)).map((s) => {
       const rd = d.rounds.find((r) => r.round === s.round);
+      const sp = d.sprints.find((r) => r.round === s.round);
       const img = S.season === "2026" ? imgTag(trackCardPhoto(s.circuitId), s.name, "trackimg") : "";
       const win = rd && rd.winner
         ? `<div class="twin">🏆 ${PHOTOS() ? imgTag(teamLogo(rd.winner.teamId), rd.winner.name, "logo sm") : `<b>${esc(rd.winner.code)}</b>`} <span>${esc(rd.winner.name)}</span></div>`
         : `<div class="twin mut">⏳ ${esc(s.date)}</div>`;
+      const swin = sp && sp.winner
+        ? `<div class="twin">⚡ ${PHOTOS() ? imgTag(teamLogo(sp.winner.teamId), sp.winner.name, "logo sm") : `<b>${esc(sp.winner.code)}</b>`} <span>${esc(sp.winner.name)}</span></div>`
+        : "";
       return `<div class="tcard" data-round="${s.round}">
-        <div class="timg">${img}<span class="tround">R${s.round}</span></div>
+        <div class="timg">${img}<span class="tround">R${s.round}</span>${sp ? `<span class="tsprint">SPRINT</span>` : ""}</div>
         <div class="tbody"><div class="tname">${esc(s.name)}</div>
-        <div class="tmeta">${esc(s.circuit)}</div>${win}</div>
+        <div class="tmeta">${esc(s.circuit)}</div>${win}${swin}</div>
       </div>`;
     });
     html = `<div class="trackgrid">${cards.join("") || "Sonuç yok"}</div>`;
@@ -152,12 +156,12 @@ function render() {
         left = table(["Takım", "Puan"], lastRoundTeams(last).map((t, i) =>
           `<tr><td class="${medalClass(i + 1)}"><span class="who">${PHOTOS() ? imgTag(teamLogo(t.id), t.name, "logo") : ""}${esc(t.name)}</span></td><td class="pts">${fmtPts(t.v)}</td></tr>`));
       }
-      const right = table(isD ? ["#", "Δ", "Pilot", "Takım", "G", "Puan"] : ["#", "Δ", "Takım", "G", "Puan"],
+      const right = table(isD ? ["#", "Δ", "Pilot", "Takım", "G", "SW", "Puan"] : ["#", "Δ", "Takım", "G", "Puan"],
         rows.map((x) => {
           const bar = `<span class="tbar" style="background:${teamColor(isD ? x.teamId : x.id)}"></span>`;
           if (isD) {
             const ph = PHOTOS() ? imgTag(driverPhoto(x.code), x.name, "dphoto") : "";
-            return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
+            return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td><td>${x.swins || ""}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
           }
           const logo = PHOTOS() ? imgTag(teamLogo(x.id), x.name, "logo") : "";
           const car = PHOTOS() ? imgTag(teamCarPhoto(x.id), x.name, "carphoto") : "";
@@ -167,12 +171,12 @@ function render() {
       stat = `${rows.length} ${isD ? "pilot" : "takım"} • oklar bir önceki tura göre`;
     } else {
       const rows = api.computeTable(d, opts).filter((x) => matchQ(x.name, x.code || ""));
-      html = table(isD ? ["#", "Pilot", "Takım", "Galibiyet", "Puan"] : ["#", "Takım", "Galibiyet", "Puan"],
+      html = table(isD ? ["#", "Pilot", "Takım", "Galibiyet", "SW", "Puan"] : ["#", "Takım", "Galibiyet", "Puan"],
         rows.map((x, i) => {
           const bar = `<span class="tbar" style="background:${teamColor(isD ? x.teamId : x.id)}"></span>`;
           if (isD) {
             const ph = PHOTOS() ? imgTag(driverPhoto(x.code), x.name, "dphoto") : "";
-            return `<tr><td class="pos">${i + 1}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
+            return `<tr><td class="pos">${i + 1}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td><td>${x.swins || ""}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
           }
           const logo = PHOTOS() ? imgTag(teamLogo(x.id), x.name, "logo") : "";
           return `<tr><td class="pos">${i + 1}</td><td><span class="who">${logo}<span>${bar}${esc(x.name)}</span></span></td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
@@ -181,15 +185,22 @@ function render() {
     }
   } else if (S.tab === "qr") {
     if (!R) {
-      // Excel'deki gibi büyük matris: satırlar pilotlar, sütunlar tur başına Grid/Yarış
+      // Excel'deki gibi büyük matris: satırlar pilotlar, sütunlar olay başına Grid/Yarış
+      // (sprint olan turlarda sprint kolonları GP'den önce gelir)
       const drvs = api.getDriverStandings(d).filter((x) => matchQ(x.name, x.code, x.team));
-      const rds = d.rounds;
+      const sprintByRound = new Map(d.sprints.map((s) => [s.round, s]));
+      const cols = [];
+      for (const rd of d.rounds) {
+        const sp = sprintByRound.get(rd.round);
+        if (sp) cols.push({ ev: sp, q: `R${rd.round}S-Q`, r: `R${rd.round}S-R` });
+        cols.push({ ev: rd, q: `R${rd.round} Q`, r: `R${rd.round} R` });
+      }
       const shortStatus = (s) => s === "Did not start" ? "DNS" : s === "Disqualified" ? "DSQ" : "DNF";
       const body = drvs.map((x) => {
         const cells = [`<td class="drv"><b>${esc(x.code)}</b> ${esc(x.name)}</td>`];
         let gS = 0, gN = 0, fS = 0, fN = 0;
-        for (const rd of rds) {
-          const row = rd.drivers.find((y) => y.id === x.id);
+        for (const c of cols) {
+          const row = c.ev.drivers.find((y) => y.id === x.id);
           if (!row) { cells.push("<td>–</td>", "<td>–</td>"); continue; }
           const raw = String(row.gridRaw);
           const gd = /^\d+$/.test(raw) && Number(raw) > 0 ? Number(raw) : null;
@@ -203,9 +214,9 @@ function render() {
         cells.push(`<td class="pts avg">${avg(gS, gN)}</td>`, `<td class="pts avg">${avg(fS, fN)}</td>`);
         return `<tr>${cells.join("")}</tr>`;
       });
-      const head = ["Pilot", ...rds.flatMap((r) => [`R${r.round} Q`, `R${r.round} R`]), "ORT Q", "ORT R"];
+      const head = ["Pilot", ...cols.flatMap((c) => [c.q, c.r]), "ORT Q", "ORT R"];
       html = `<div class="tablewrap"><table class="matrix"><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${body.join("")}</tbody></table></div>`;
-      stat = `${rds.length} tur × ${drvs.length} pilot • ORT-Q: tüm turlar, ORT-R: klasman bitirilenler`;
+      stat = `${cols.length} olay × ${drvs.length} pilot • ORT-Q: tüm turlar, ORT-R: klasman bitirilenler`;
     } else {
       const list = R.drivers.filter((x) => matchQ(x.name, x.code, x.team));
       html = table(["Grid", "Pilot", "Finiş", "Kazanç", "Durum"],

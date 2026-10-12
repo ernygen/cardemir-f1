@@ -27,13 +27,13 @@ async function fetchJson(path, timeoutMs = 25000) {
 // Jolpica sayfalamayı satır bazında yapar (limit max 100), turlar bölünebilir.
 // Bu yüzden tüm satırları toplayıp tura göre biz gruplarız.
 async function fetchAllRows(path) {
+  const key = path.includes("sprint") ? "SprintResults" : path.includes("qualifying") ? "QualifyingResults" : "Results";
   const rows = [];
   let offset = 0;
   for (let page = 0; page < 50; page++) {
     const json = await fetchJson(`${path}?limit=${PAGE}&offset=${offset}`);
     const table = json.MRData.RaceTable;
     for (const race of table.Races) {
-      const key = path.includes("results") ? "Results" : "QualifyingResults";
       for (const row of race[key] || []) rows.push({ round: Number(race.round), row });
     }
     const total = Number(json.MRData.total);
@@ -118,19 +118,40 @@ export async function loadSeason(year) {
     round: Number(r.round), name: r.raceName, date: r.date,
     circuit: r.Circuit.circuitName, circuitId: r.Circuit.circuitId,
   }));
-  const [resRows] = await Promise.all([fetchAllRows(`/${year}/results.json`)]);
-  const byRound = new Map();
-  for (const { round, row } of resRows) {
-    if (!byRound.has(round)) byRound.set(round, []);
-    byRound.get(round).push(row);
-  }
+  const [resRows, sprintRows] = await Promise.all([
+    fetchAllRows(`/${year}/results.json`),
+    fetchAllRows(`/${year}/sprint.json`).catch(() => []),
+  ]);
+  const group = (rows) => {
+    const m = new Map();
+    for (const { round, row } of rows) {
+      if (!m.has(round)) m.set(round, []);
+      m.get(round).push(row);
+    }
+    return m;
+  };
   const schedByRound = new Map(schedule.map((s) => [s.round, s]));
-  const rounds = [...byRound.entries()]
+  const sprintSet = new Set();
+  const rounds = [...group(resRows).entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([round, rows]) => {
       const s = schedByRound.get(round) || {};
-      return computeRound(round, s.name || `Round ${round}`, s.date || "", rows);
+      const ev = computeRound(round, s.name || `Round ${round}`, s.date || "", rows);
+      ev.key = String(round); ev.sprint = false; ev.seq = round * 2;
+      return ev;
     });
+  const sprints = [...group(sprintRows).entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([round, rows]) => {
+      const s = schedByRound.get(round) || {};
+      const base = (s.name || `Round ${round}`).replace(" Grand Prix", "");
+      const ev = computeRound(round, `${base} Sprint`, s.date || "", rows);
+      ev.key = `${round}S`; ev.sprint = true; ev.seq = round * 2 - 1;
+      sprintSet.add(round);
+      return ev;
+    });
+  // Tüm olaylar (sprint kendi turunun GP'sinden önce): toplamlar buradan hesaplanır
+  const events = [...rounds, ...sprints].sort((a, b) => a.seq - b.seq);
 
   const drivers = new Map();
   const teams = new Map();
@@ -165,7 +186,8 @@ export async function loadSeason(year) {
     }
   }
   return {
-    source: `f1api:${year}`, season: year, schedule, rounds,
+    source: `f1api:${year}`, season: year, schedule, rounds, sprints, events,
+    sprintRounds: [...sprintSet].sort((a, b) => a - b),
     completed: rounds.length,
     drivers: [...drivers.values()], teams: [...teams.values()],
   };
@@ -176,19 +198,20 @@ export async function loadSeasonsList() {
   return json.MRData.SeasonTable.Seasons.map((s) => s.season);
 }
 
-// Belirli bir tura kadar kümülatif tablo. metric: real|pg|pgnn|pgc|ters
-// (pgns = metric pgc + split:false). upto: dahil olan son tur no (Infinity = tümü).
+// Belirli bir olaya kadar kümülatif tablo. metric: real|pg|pgnn|pgc|ters
+// (pgns = metric pgc + split:false). upto: dahil olan son olay seq'i (Infinity = tümü).
+// GP + sprintler birlikte hesaplanır (sprint ayrı bir olaydır).
 export function computeTable(data, { who = "drivers", metric = "real", upto = Infinity, split = true } = {}) {
   const agg = new Map();
-  for (const rd of data.rounds) {
-    if (rd.round > upto) continue;
+  for (const rd of data.events) {
+    if (rd.seq > upto) continue;
     for (const d of rd.drivers) {
       if (!agg.has(d.id)) {
-        agg.set(d.id, { id: d.id, code: d.code, name: d.name, team: d.team, teamId: d.teamId, value: 0, wins: 0 });
+        agg.set(d.id, { id: d.id, code: d.code, name: d.name, team: d.team, teamId: d.teamId, value: 0, wins: 0, swins: 0 });
       }
       const a = agg.get(d.id);
       a.team = d.team; a.teamId = d.teamId;
-      if (metric === "real") { a.value += d.realPoints; if (d.finish === 1) a.wins++; }
+      if (metric === "real") { a.value += d.realPoints; if (d.finish === 1) { if (rd.sprint) a.swins++; else a.wins++; } }
       else if (metric === "pg") { if (d.gain !== null) a.value += d.gain; }
       else if (metric === "pgnn") { if (d.gain !== null) a.value += Math.max(0, d.gain); }
       else if (metric === "pgc") { a.value += (split ? rd.pgcSplit : rd.pgns).get(d.id) || 0; }
@@ -207,10 +230,10 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
       const T = t.get(teamId);
       T.name = name; T.value += v; T.wins += win ? 1 : 0;
     };
-    for (const rd of data.rounds) {
-      if (rd.round > upto) continue;
+    for (const rd of data.events) {
+      if (rd.seq > upto) continue;
       for (const d of rd.drivers) {
-        if (metric === "real") add(d.teamId, d.team, d.realPoints, d.finish === 1);
+        if (metric === "real") add(d.teamId, d.team, d.realPoints, d.finish === 1 && !rd.sprint);
         else if (metric === "pg" && d.gain !== null) add(d.teamId, d.team, d.gain, false);
         else if (metric === "pgnn" && d.gain !== null) add(d.teamId, d.team, Math.max(0, d.gain), false);
         else if (metric === "pgc") add(d.teamId, d.team, (split ? rd.pgcSplit : rd.pgns).get(d.id) || 0, false);
@@ -222,14 +245,14 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
   return arr;
 }
 
-// Sezon toplamı + bir önceki tura göre sıra farkı (oklar için).
+// Sezon toplamı + bir önceki olaya göre sıra farkı (oklar için).
 // Dönüş: [{..., rank, prev (sıra no / null=yeni), diff}]
 export function tableWithChanges(data, opts) {
   const full = computeTable(data, opts);
-  const n = data.rounds.length;
-  if (n < 2) return full.map((x, i) => ({ ...x, rank: i + 1, prev: null, diff: null }));
-  const prevRound = data.rounds[n - 2].round;
-  const before = computeTable(data, { ...opts, upto: prevRound });
+  const evs = data.events;
+  if (evs.length < 2) return full.map((x, i) => ({ ...x, rank: i + 1, prev: null, diff: null }));
+  const prevSeq = evs[evs.length - 2].seq;
+  const before = computeTable(data, { ...opts, upto: prevSeq });
   const rb = new Map(before.map((x, i) => [x.id, i + 1]));
   return full.map((x, i) => {
     const p = rb.has(x.id) ? rb.get(x.id) : null;
@@ -244,7 +267,7 @@ export const getPGC = (d, split = true) => computeTable(d, { who: "drivers", met
 export const getTers = (d) => computeTable(d, { who: "drivers", metric: "ters" });
 export const getTeamPGC = (d, split = true) => computeTable(d, { who: "teams", metric: "pgc", split });
 export const getTeamTers = (d) => computeTable(d, { who: "teams", metric: "ters" });
-export const getRound = (d, round) => d.rounds.find((r) => r.round === Number(round));
+export const getRound = (d, key) => d.events.find((r) => r.key === String(key));
 
 export function getChampions(data) {
   const dw = computeTable(data, { who: "drivers", metric: "real" })[0];
