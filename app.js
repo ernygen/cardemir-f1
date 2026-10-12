@@ -73,7 +73,7 @@ function fillRounds() {
   const ds = S.data.rounds;
   sel.innerHTML = `<option value="">Sezon toplamı (${ds.length} tur)</option>` +
     ds.map((r) => `<option value="${r.round}" ${String(r.round) === S.round ? "selected" : ""}>R${r.round} — ${esc(r.name)}</option>`).join("");
-  if (S.tab === "qr" && !S.round && ds.length) { S.round = String(ds[ds.length - 1].round); sel.value = S.round; }
+  if (S.tab === "qr" && !S.round && ds.length) { sel.value = ""; }
 }
 
 function table(head, rows) {
@@ -180,11 +180,39 @@ function render() {
       stat = `${rows.length} ${isD ? "pilot" : "takım"}`;
     }
   } else if (S.tab === "qr") {
-    const list = R ? R.drivers.filter((x) => matchQ(x.name, x.code, x.team)) : [];
-    html = table(["Grid", "Pilot", "Finiş", "Kazanç", "Durum"],
-      [...list].sort((a, b) => (a.grid - b.grid)).map((x) =>
-        `<tr><td class="pos">${x.grid}</td><td>${drvResult(x)}</td><td class="${medalClass(x.finish)}">${x.finish === null || x.finish === undefined ? "–" : "P" + x.finish}</td><td class="pts">${x.gain === null ? "–" : (x.gain > 0 ? "+" : "") + x.gain}</td><td class="mut">${esc(x.status)}</td></tr>`));
-    stat = R ? `${R.name} • ${list.length} pilot` : "Tur seç";
+    if (!R) {
+      // Excel'deki gibi büyük matris: satırlar pilotlar, sütunlar tur başına Grid/Yarış
+      const drvs = api.getDriverStandings(d).filter((x) => matchQ(x.name, x.code, x.team));
+      const rds = d.rounds;
+      const shortStatus = (s) => s === "Did not start" ? "DNS" : s === "Disqualified" ? "DSQ" : "DNF";
+      const body = drvs.map((x) => {
+        const cells = [`<td class="drv"><b>${esc(x.code)}</b> ${esc(x.name)}</td>`];
+        let gS = 0, gN = 0, fS = 0, fN = 0;
+        for (const rd of rds) {
+          const row = rd.drivers.find((y) => y.id === x.id);
+          if (!row) { cells.push("<td>–</td>", "<td>–</td>"); continue; }
+          const raw = String(row.gridRaw);
+          const gd = /^\d+$/.test(raw) && Number(raw) > 0 ? Number(raw) : null;
+          cells.push(`<td>${gd === null ? "PL" : gd}</td>`);
+          if (row.classified) cells.push(`<td class="pts">P${row.finish}</td>`);
+          else cells.push(`<td class="mut">${shortStatus(row.status)}</td>`);
+          if (gd !== null) { gS += gd; gN++; }
+          if (row.classified) { fS += row.finish; fN++; }
+        }
+        const avg = (s, n) => n ? (Math.round(s / n * 10) / 10) : "–";
+        cells.push(`<td class="pts avg">${avg(gS, gN)}</td>`, `<td class="pts avg">${avg(fS, fN)}</td>`);
+        return `<tr>${cells.join("")}</tr>`;
+      });
+      const head = ["Pilot", ...rds.flatMap((r) => [`R${r.round} Q`, `R${r.round} R`]), "ORT Q", "ORT R"];
+      html = `<div class="tablewrap"><table class="matrix"><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${body.join("")}</tbody></table></div>`;
+      stat = `${rds.length} tur × ${drvs.length} pilot • ORT-Q: tüm turlar, ORT-R: klasman bitirilenler`;
+    } else {
+      const list = R.drivers.filter((x) => matchQ(x.name, x.code, x.team));
+      html = table(["Grid", "Pilot", "Finiş", "Kazanç", "Durum"],
+        [...list].sort((a, b) => (a.grid - b.grid)).map((x) =>
+          `<tr><td class="pos">${x.grid}</td><td>${drvResult(x)}</td><td class="${medalClass(x.finish)}">${x.finish === null || x.finish === undefined ? "–" : "P" + x.finish}</td><td class="pts">${x.gain === null ? "–" : (x.gain > 0 ? "+" : "") + x.gain}</td><td class="mut">${esc(x.status)}</td></tr>`));
+      stat = R.name + ` • ${list.length} pilot`;
+    }
   } else if (S.tab === "pg" || S.tab === "pgnn") {
     const nn = S.tab === "pgnn";
     const metric = nn ? "pgnn" : "pg";
