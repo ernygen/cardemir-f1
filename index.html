@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Cardemir F1 — Canlı Şampiyonalar</title>
+<title>Cardemir F1 — Live Championships</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,400;0,600;0,700;1,400;1,700&display=swap" rel="stylesheet" />
@@ -14,32 +14,32 @@
 <header>
   <div class="logo"><img src="./logo.png?v=8" class="sitelogo" alt="Cardemir F1" /><span id="sourceBadge">F1 API</span></div>
   <div class="seasonbox">
-    <label for="season">Sezon</label>
+    <label for="season">Season</label>
     <select id="season"></select>
   </div>
 </header>
 <nav id="tabs"></nav>
 <main>
   <section class="controls">
-    <input id="search" type="search" placeholder="Pilot / takım ara..." />
+    <input id="search" type="search" placeholder="Search driver / team..." />
     <select id="pgMode"></select>
     <select id="roundFilter"></select>
   </section>
-  <section class="meta"><span id="statLine">yükleniyor...</span><span id="updated"></span></section>
+  <section class="meta"><span id="statLine">loading...</span><span id="updated"></span></section>
   <section id="content"></section>
   <details class="how">
-    <summary>Kurallar</summary>
+    <summary>Rules</summary>
     <ul>
-      <li><b>QR:</b> yarış başlangıç gridi → yarış sonucu.</li>
-      <li><b>PG:</b> grid − finiş (pozisyon kazancı). <b>PGNN:</b> negatifler 0 sayılır.</li>
-      <li><b>PGC:</b> her tur en çok kazanan 10 pilota 25-18-15… puanı; eşitlikte slot puanları bölüşülür, eşitlik bozma gerçek finişe göre.</li>
-      <li><b>PGNS:</b> aynı ama bölüşmesiz, direkt sıra puanı.</li>
-      <li><b>Ters:</b> klasmanı bitirenler sondan başa puanlanır (sonuncu 25), DNF'ler yok.</li>
-      <li>Veri: Jolpica F1 API (canlı takvim + sonuçlar). Sprintler v1'de yok.</li>
+      <li><b>QR:</b> starting grid → race result.</li>
+      <li><b>PG:</b> grid − finish (position gain). <b>PGNN:</b> negatives count as 0.</li>
+      <li><b>PGC:</b> top 10 gainers per event score 25-18-15… points; ties split slot points, tiebreak by real finish.</li>
+      <li><b>PGNS:</b> same but no split — straight positional points.</li>
+      <li><b>Reverse:</b> classified finishers scored back-to-front (last gets 25), no DNFs.</li>
+      <li>Data: Jolpica F1 API (live calendar + results).</li>
     </ul>
   </details>
 </main>
 <script type="module" src="./app.js?v=8"></script>
-<footer>Pilot/araç görselleri © Formula One (media.formula1.com) • Veri: Jolpica F1 API</footer>
+<footer>Driver/car photos © Formula One (media.formula1.com) • Data: Jolpica F1 API</footer>
 </body>
 </html>
