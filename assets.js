@@ -1,9 +1,9 @@
-// Pilot portreleri her yıl Wikipedia'dan.
-// Takım logosu/arabası 2026'da F1 CDN, eski yıllarda Wikipedia.
+// Driver photos: F1 CDN cutout when the driver is in the 2026 lineup, else Wikipedia portrait.
+// Team logo/car: 2026 F1 CDN when mapped, else Wikipedia. Track cards: F1 scenic when mapped.
 const IMG = "https://media.formula1.com/image/upload";
 const VER = "v1740000001";
 
-// constructorId (Jolpica) -> F1 slug + resmi takım rengi (OpenF1 team_colour)
+// constructorId (Jolpica) -> F1 slug + official team colour (OpenF1 team_colour)
 export const TEAM_META = {
   mercedes:     { slug: "mercedes",      color: "#00D7B6" },
   ferrari:      { slug: "ferrari",       color: "#ED1131" },
@@ -18,7 +18,7 @@ export const TEAM_META = {
   cadillac:     { slug: "cadillac",      color: "#909090" },
 };
 
-// pilot kodu -> [takım slug, pilot slug] (formula1.com/en/drivers 2026)
+// driver code -> [team slug, driver slug] (formula1.com/en/drivers 2026)
 const DRIVER_SLUG = {
   RUS: ["mercedes", "georus"], ANT: ["mercedes", "andant"],
   LEC: ["ferrari", "chalec"], HAM: ["ferrari", "lewham"],
@@ -40,6 +40,8 @@ export function driverPhoto(code) {
   return `${IMG}/c_lfill,w_440/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/${VER}/common/f1/2026/${team}/${drv}01/2026${team}${drv}01right.webp`;
 }
 
+export const hasTeam = (id) => Boolean(TEAM_META[id]);
+
 export function teamCarPhoto(constructorId) {
   const m = TEAM_META[constructorId];
   if (!m) return null;
@@ -52,7 +54,7 @@ export function teamLogo(constructorId) {
   return `${IMG}/c_lfill,w_200/q_auto/${VER}/common/f1/2026/${m.slug}/2026${m.slug}logo.webp`;
 }
 
-// Pist kartları (formula1.com/en/racing/2026) — circuitId -> kart slug
+// Track cards (formula1.com/en/racing/2026) — circuitId -> card slug
 const TRACK_CARD = {
   albert_park: "australia", shanghai: "china", suzuka: "japan", miami: "miami",
   villeneuve: "canada", monaco: "monaco", catalunya: "spain", red_bull_ring: "austria",
@@ -73,8 +75,8 @@ export function teamColor(constructorId) {
   return (TEAM_META[constructorId] || {}).color || "#e10600";
 }
 
-// Eski sezon görselleri: Ergast'ın verdiği Wikipedia linkinden küçük resim.
-// Pilot: portre, pist: yarış/harita fotoğrafı, takım: logo (bulunamazsa makale görseli).
+// Old-season images: thumbnails from Ergast-provided Wikipedia links.
+// Driver: portrait, track: race/map photo, team: logo (else article image).
 const wikiCache = new Map(); // key -> Promise<string|null>
 
 export function wikiTitle(url) {
@@ -96,7 +98,7 @@ function cached(key, fn) {
   return wikiCache.get(key);
 }
 
-// Makalenin ana görseli
+// Article main image
 export function wikiPageThumb(title) {
   return cached("p:" + title, async () => {
     const q = await wikiApi({ prop: "pageimages", pithumbsize: 400, titles: title });
@@ -109,7 +111,7 @@ export function wikiPageThumb(title) {
   });
 }
 
-// Takım logosu: sayfadaki logo dosyası, yoksa ana görsel
+// Team logo: logo file on the page, else main image
 export function wikiLogoThumb(articleUrl) {
   const title = wikiTitle(articleUrl);
   if (!title) return Promise.resolve(null);
@@ -165,7 +167,7 @@ function fill(imgs, src) {
   }
 }
 
-// render sonrası çağır: bekleyen wiki kutularını doldurur (bulunamazsa gizler)
+// call after render: fills pending wiki boxes (hides when not found)
 export async function hydrateWiki(root) {
   const doc = root || document;
   const jobs = [];
@@ -199,7 +201,7 @@ export async function hydrateWiki(root) {
   if (jobs.length) await Promise.all(jobs);
 }
 
-// <img> hata verirse sessizce gizle (foto yoksa tablo bozulmasın)
+// hide <img> silently on error (missing photo won't break tables)
 export function imgTag(src, alt, cls) {
   if (!src) return "";
   const safe = alt.replace(/"/g, "");

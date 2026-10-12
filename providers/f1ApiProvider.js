@@ -1,7 +1,7 @@
-// F1 API provider — Jolpica (Ergast devamı).
-// Excel'den veri alınmaz; Excel sadece konsepttir.
-// Bu modül takvim + yarış sonuçlarını API'den çeker,
-// Cardemir özel şampiyonalarını (PG/PGNN/PGC/PGNS/Ters/QR) kendisi hesaplar.
+// F1 API provider — Jolpica (Ergast successor).
+// No data from Excel; Excel is only the concept.
+// This module fetches calendar + race results from the API
+// and computes the Cardemir custom championships (PG/PGNN/PGC/PGNS/Ters/QR) itself.
 
 const BASE = "https://api.jolpi.ca/ergast/f1";
 const PAGE = 100;
@@ -9,7 +9,7 @@ const PAGE = 100;
 export const PGC_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 export const SPRINT_POINTS = [8, 7, 6, 5, 4, 3, 2, 1];
 const CLASSIFIED = new Set(["Finished", "Lapped"]);
-// Eski sezonlarda tur yiyenler "+1 Lap" diye geçer, yenilerde "Lapped"
+// Lapped cars are "+1 Lap" in old seasons, "Lapped" in new ones
 const isClassified = (status) =>
   CLASSIFIED.has(status) || /^\+\d+\s+laps?$/i.test(status || "");
 
@@ -26,7 +26,7 @@ async function fetchJson(path, timeoutMs = 25000, retries = 3) {
       if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
       return res.json();
     } catch (e) {
-      if (e.name === "AbortError") throw new Error(`API zaman aşımı (25sn): ${path}`);
+      if (e.name === "AbortError") throw new Error(`API timeout (25s): ${path}`);
       throw e;
     } finally {
       clearTimeout(t);
@@ -34,8 +34,8 @@ async function fetchJson(path, timeoutMs = 25000, retries = 3) {
   }
 }
 
-// Jolpica sayfalamayı satır bazında yapar (limit max 100), turlar bölünebilir.
-// Bu yüzden tüm satırları toplayıp tura göre biz gruplarız.
+// Jolpica paginates by row (limit max 100), rounds may split.
+// So we collect all rows and group by round ourselves.
 async function fetchAllRows(path) {
   const key = path.includes("sprint") ? "SprintResults" : path.includes("qualifying") ? "QualifyingResults" : "Results";
   const rows = [];
@@ -69,7 +69,7 @@ function code(d) {
   return d.Driver.code || d.Driver.familyName.slice(0, 3).toUpperCase();
 }
 
-// Bir tur için özel şampiyona hesapları (sprint ise 8'lik puan ölçeği)
+// Custom championship math for one event (8-point scale for sprints)
 function computeRound(roundNo, name, date, rows, sprint = false) {
   const PTS = sprint ? SPRINT_POINTS : PGC_POINTS;
   const classified = [];
@@ -78,7 +78,7 @@ function computeRound(roundNo, name, date, rows, sprint = false) {
     const g = num(r.grid);
     if (g !== null && g > maxGrid) maxGrid = g;
   }
-  const plGrid = maxGrid + 1; // grid "0"/PL ile başlayanlar en arkadan sayılır
+  const plGrid = maxGrid + 1; // "0"/PL starters count from the back
   let winner = null;
   for (const r of rows) {
     const pos = num(r.position);
@@ -96,10 +96,10 @@ function computeRound(roundNo, name, date, rows, sprint = false) {
     });
   }
   const cls = classified.filter((d) => d.classified);
-  // PG sırası: kazanç desc, eşitlikte gerçek finiş önde
+  // PG order: gain desc, ties broken by real finish
   const byGain = [...cls].sort((a, b) => b.gain - a.gain || a.finish - b.finish);
 
-  // PGC: splitli — eşit kazançlar slot puanlarını bölüşür
+  // PGC: split — tied gains share slot points
   const pgcSplit = new Map();
   let i = 0;
   while (i < byGain.length && i < PTS.length) {
@@ -111,11 +111,11 @@ function computeRound(roundNo, name, date, rows, sprint = false) {
     for (let k = i; k < end; k++) pgcSplit.set(byGain[k].id, each);
     i = j;
   }
-  // PGNS: splitsiz — sıra puanını direkt alır
+  // PGNS: no split — takes positional points directly
   const pgns = new Map();
   byGain.slice(0, PTS.length).forEach((d, k) => pgns.set(d.id, PTS[k]));
 
-  // Ters: klasmanı sondan başa puanla (sonuncu 25), DNF'sizler yok
+  // Reverse: score classified back-to-front (last gets 25), no DNFs
   const byReverse = [...cls].sort((a, b) => b.finish - a.finish);
   const ters = new Map();
   byReverse.slice(0, PTS.length).forEach((d, k) => ters.set(d.id, PTS[k]));
@@ -142,7 +142,7 @@ export async function loadSeason(year) {
     return m;
   };
   const schedByRound = new Map(schedule.map((s) => [s.round, s]));
-  // Takım Wikipedia linkleri (eski sezon görselleri için)
+  // Team Wikipedia links (for old-season images)
   const teamWiki = {};
   for (const { row } of [...resRows, ...sprintRows]) {
     if (row.Constructor && row.Constructor.url) teamWiki[row.Constructor.constructorId] = row.Constructor.url;
@@ -166,7 +166,7 @@ export async function loadSeason(year) {
       sprintSet.add(round);
       return ev;
     });
-  // Tüm olaylar (sprint kendi turunun GP'sinden önce): toplamlar buradan hesaplanır
+  // All events (sprint before its round's GP): totals computed from here
   const events = [...rounds, ...sprints].sort((a, b) => a.seq - b.seq);
 
   const drivers = new Map();
@@ -214,9 +214,9 @@ export async function loadSeasonsList() {
   return json.MRData.SeasonTable.Seasons.map((s) => s.season);
 }
 
-// Belirli bir olaya kadar kümülatif tablo. metric: real|pg|pgnn|pgc|ters
-// (pgns = metric pgc + split:false). upto: dahil olan son olay seq'i (Infinity = tümü).
-// GP + sprintler birlikte hesaplanır (sprint ayrı bir olaydır).
+// Cumulative table up to an event. metric: real|pg|pgnn|pgc|ters
+// (pgns = metric pgc + split:false). upto: last included event seq (Infinity = all).
+// GPs + sprints computed together (sprint is a separate event).
 export function computeTable(data, { who = "drivers", metric = "real", upto = Infinity, split = true } = {}) {
   const agg = new Map();
   for (const rd of data.events) {
@@ -239,8 +239,8 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
   if (metric === "real") arr.sort((a, b) => b.value - a.value || b.wins - a.wins);
   else arr.sort((a, b) => b.value - a.value);
   if (who === "teams") {
-    // Takımlar: turun atandığı takıma yazılır (sezon içi takım değiştiren pilotun
-    // eski puanı eski takımda kalır — örn. Lawson'un Red Bull puanları).
+    // Teams: credited to the round's team (a mid-season mover's old points
+    // stay with the old team — e.g. Lawson's Red Bull points).
     const t = new Map();
     const add = (teamId, name, v, win) => {
       if (!t.has(teamId)) t.set(teamId, { id: teamId, name, value: 0, wins: 0 });
@@ -262,8 +262,8 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
   return arr;
 }
 
-// Sezon toplamı + bir önceki olaya göre sıra farkı (oklar için).
-// Dönüş: [{..., rank, prev (sıra no / null=yeni), diff}]
+// Season total + rank change vs previous event (for arrows).
+// Returns: [{..., rank, prev (rank no / null=new), diff}]
 export function tableWithChanges(data, opts) {
   const full = computeTable(data, opts);
   const evs = data.events;

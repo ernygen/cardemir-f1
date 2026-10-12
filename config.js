@@ -1,14 +1,14 @@
-// Canlı veri: Jolpica F1 API. Excel'den veri alınmaz, Excel sadece konsepttir.
+// Live data: Jolpica F1 API. No data from Excel, Excel is only the concept.
 export const DEFAULT_SEASON = "2026";
 export const MIN_SEASON = "1950";
 export const MAX_SEASON = "2026";
 
-// Bingo (WC) olayları — Excel konseptinden sabit içerik, veri değil.
+// Bingo (WC) events — static content from the Excel concept, not data.
 export const BINGO_EVENTS = [
   "Colapinto Win",
   "FIA Mercedes Drama",
   "Max Leaving",
-  "Bearman Podyum",
-  "Bearman Ferrari",
-  "Alonso, Hulk Lewis R.",
+  "Bearman Podium",
+  "Bearman to Ferrari",
+  "Alonso, Hulk, Lewis retire",
 ];

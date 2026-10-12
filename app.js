@@ -1,9 +1,6 @@
 import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js";
 import * as api from "./providers/f1ApiProvider.js";
-import { driverPhoto, teamCarPhoto, teamLogo, trackCardPhoto, teamColor, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki } from "./assets.js";
-
-// Fotoğraflar sadece 2026 sezonu için (formula1.com 2026 kadrosu)
-const PHOTOS = () => S.season === "2026";
+import { driverPhoto, teamCarPhoto, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki } from "./assets.js";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
@@ -88,12 +85,12 @@ function table(head, rows) {
   return `<table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("") || `<tr><td colspan="${head.length}">No results</td></tr>`}</tbody></table>`;
 }
 
-// Yarış sonucu ilk 3: altın-gümüş-bronz (finish sırasına göre)
+// Race top 3: gold-silver-bronze (by finish)
 function medalClass(finish) {
   return finish === 1 ? "m1" : finish === 2 ? "m2" : finish === 3 ? "m3" : "";
 }
 
-// Pilotun sezonluk ortalama grid / finişi (PGC toplam tablosu için)
+// Driver season-average grid / finish (for PGC totals)
 function avgQF(d, id) {
   let gS = 0, gN = 0, fS = 0, fN = 0;
   for (const ev of d.events) {
@@ -107,18 +104,21 @@ function avgQF(d, id) {
   return [a(gS, gN), a(fS, fN)];
 }
 
-// Pilot fotosu: 2026'da F1 CDN kesitleri, eski sezonlarda Wikipedia portresi
-const photoFor = (x, cls) => PHOTOS() ? imgTag(driverPhoto(x.code), x.name, cls) : wikiImg(x.wiki, cls, x.name);
-// Takım görseli: 2026'da F1 CDN, eskilerde Wikipedia (logo dosya araması, yoksa makale görseli)
+// Driver photo: 2026 F1 cutout when mapped, else Wikipedia portrait (every year)
+const photoFor = (x, cls) => {
+  const f1 = driverPhoto(x.code);
+  return f1 ? imgTag(f1, x.name, cls) : wikiImg(x.wiki, cls, x.name);
+};
+// Team visuals: 2026 F1 CDN when the team is mapped, else Wikipedia (every year)
 const teamImgFor = (d, id, name, cls, kind) => {
-  if (PHOTOS()) return imgTag(kind === "car" ? teamCarPhoto(id) : teamLogo(id), name, cls);
+  if (hasTeam(id)) return imgTag(kind === "car" ? teamCarPhoto(id) : teamLogo(id), name, cls);
   const art = d.teamWiki && d.teamWiki[id];
   return kind === "car" ? wikiImg(art, cls, name) : wikiLogoImg(art, cls, name);
 };
 
-// Sonuç tablolarında görsel: 2026'da takım logosu, eskilerde pilot fotosu (+ isim)
+// Result rows: mapped team logo, else driver portrait, else 3-letter code (+ name)
 function drvResult(x) {
-  if (PHOTOS()) {
+  if (hasTeam(x.teamId)) {
     const logo = imgTag(teamLogo(x.teamId), x.name, "logo sm");
     if (logo) return `<span class="who">${logo}<span>${esc(x.name)}</span></span>`;
   } else {
@@ -138,7 +138,7 @@ function splitView(last, leftTable, rightTable) {
   return `<div class="split"><div class="card lastrace"><div class="ct">Last race — R${last.key} ${esc(last.name)}</div>${leftTable}</div><div class="fullwrap">${rightTable}</div></div>`;
 }
 
-// Son turun takım puanları (sol panel için)
+// Last event team points (left panel)
 function lastRoundTeams(last) {
   const tm = new Map();
   for (const x of last.drivers) {
@@ -154,7 +154,7 @@ function render() {
   fillRounds();
   const d = S.data;
   if (!d) return;
-  $("updated").textContent = `Kaynak: ${d.source} • ${d.completed} tur`;
+  $("updated").textContent = `Source: ${d.source} • ${d.completed} rounds`;
   const R = S.round ? api.getRound(d, S.round) : null;
   let html = "", stat = "";
 
@@ -162,12 +162,14 @@ function render() {
     const cards = d.schedule.filter((s) => matchQ(s.name, s.circuit)).map((s) => {
       const rd = d.rounds.find((r) => r.round === s.round);
       const sp = d.sprints.find((r) => r.round === s.round);
-      const img = S.season === "2026" ? imgTag(trackCardPhoto(s.circuitId), s.name, "trackimg") : wikiGpImg(S.season, s.name, s.wiki, "trackimg", s.name);
+      const scenic = trackCardPhoto(s.circuitId);
+      const img = scenic ? imgTag(scenic, s.name, "trackimg") : wikiGpImg(S.season, s.name, s.wiki, "trackimg", s.name);
+      const winLogo = (w) => hasTeam(w.teamId) ? imgTag(teamLogo(w.teamId), w.name, "logo sm") : "";
       const win = rd && rd.winner
-        ? `<div class="twin">🏆 ${PHOTOS() ? imgTag(teamLogo(rd.winner.teamId), rd.winner.name, "logo sm") : `<b>${esc(rd.winner.code)}</b>`} <span>${esc(rd.winner.name)}</span></div>`
+        ? `<div class="twin">🏆 ${winLogo(rd.winner) || `<b>${esc(rd.winner.code)}</b>`} <span>${esc(rd.winner.name)}</span></div>`
         : `<div class="twin mut">⏳ ${esc(s.date)}</div>`;
       const swin = sp && sp.winner
-        ? `<div class="twin">⚡ ${PHOTOS() ? imgTag(teamLogo(sp.winner.teamId), sp.winner.name, "logo sm") : `<b>${esc(sp.winner.code)}</b>`} <span>${esc(sp.winner.name)}</span></div>`
+        ? `<div class="twin">⚡ ${winLogo(sp.winner) || `<b>${esc(sp.winner.code)}</b>`} <span>${esc(sp.winner.name)}</span></div>`
         : "";
       return `<div class="tcard" data-round="${s.round}">
         <div class="timg">${img}<span class="tround">R${s.round}</span>${sp ? `<span class="tsprint">SPRINT</span>` : ""}</div>
@@ -200,7 +202,7 @@ function render() {
             return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td>${x.swins ? `<td>${x.swins}</td>` : (rows.some((y) => y.swins) ? "<td></td>" : "")}<td class="pts">${fmtPts(x.value)}</td></tr>`;
           }
           const logo = teamImgFor(d, x.id, x.name, "logo", "logo");
-          const car = PHOTOS() ? imgTag(teamCarPhoto(x.id), x.name, "carphoto") : "";
+          const car = hasTeam(x.id) ? imgTag(teamCarPhoto(x.id), x.name, "carphoto") : "";
           return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${logo}${car}<span>${bar}${esc(x.name)}</span></span></td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
         }));
       html = splitView(last, left, right);
@@ -222,8 +224,8 @@ function render() {
     }
   } else if (S.tab === "qr") {
     if (!R) {
-      // Excel'deki gibi büyük matris: satırlar pilotlar, sütunlar olay başına Grid/Yarış
-      // (sprint olan turlarda sprint kolonları GP'den önce gelir)
+      // Big matrix like Excel: drivers as rows, Grid/Race columns per event
+      // (sprint columns come before the GP on sprint weekends)
       const drvs = api.getDriverStandings(d).filter((x) => matchQ(x.name, x.code, x.team));
       const sprintByRound = new Map(d.sprints.map((s) => [s.round, s]));
       const cols = [];
@@ -262,7 +264,7 @@ function render() {
       stat = R.name + ` • ${list.length} drivers`;
     }
   } else if (S.tab === "pg") {
-    // Tek sekme, üstten şampiyona seçimi: pg / pgnn / pgc / pgns
+    // Single tab, championship picker on top: pg / pgnn / pgc / pgns
     const mode = S.pgmode || "pg";
     const isPts = mode === "pgc" || mode === "pgns";
     const split = mode === "pgc";
@@ -284,7 +286,7 @@ function render() {
     } else if (d.events.length >= 2) {
       const rows = api.tableWithChanges(d, { who: "drivers", metric, split }).filter((x) => matchQ(x.name, x.code));
       const map = isPts ? (split ? lastEv.pgcSplit : lastEv.pgns) : null;
-      // PG/PGNN sol panel: tüm grid (klasman dışı en altta); PGC/PGNS: sadece puan alanlar
+      // PG/PGNN left panel: full grid (unclassified at bottom); PGC/PGNS: scorers only
       const fullGrid = [...lastEv.drivers].sort((a, b) => (b.gain ?? -999) - (a.gain ?? -999));
       const leftList = isPts
         ? lastEv.byGain.filter((x) => map.has(x.id))
@@ -370,7 +372,7 @@ function render() {
     const c = e.target.closest(".tcard");
     if (!c) return;
     const r = api.getRound(S.data, c.dataset.round);
-    if (!r) return; // henüz koşulmamış yarışın detayı yok
+    if (!r) return; // no detail for unrun races yet
     S.round = c.dataset.round;
     S.tab = "qr";
     [...$("tabs").children].forEach((x) => x.classList.toggle("active", x.dataset.t === "qr"));
