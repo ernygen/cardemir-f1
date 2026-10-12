@@ -266,7 +266,10 @@ function render() {
       <div class="card" style="border-top-color:${dcol}"><div class="ct">Pilot Şampiyonu</div><div class="cb">${dph}<span><b>${c.driver ? esc(c.driver.code) : "—"}</b> ${c.driver ? esc(c.driver.name) : ""}</span></div><div class="cm">${c.driver ? fmtPts(c.driver.value) + " puan • " + c.driver.wins + " galibiyet" : ""}</div></div>
       <div class="card" style="border-top-color:${tcol}"><div class="ct">Takım Şampiyonu</div><div class="cb">${tlogo}<b>${c.team ? esc(c.team.name) : "—"}</b></div><div class="cm">${c.team ? fmtPts(c.team.value) + " puan • " + c.team.wins + " galibiyet" : ""}</div></div>
       <div class="card"><div class="ct">Sezon</div><div class="cb"><b>${esc(S.season)}</b></div><div class="cm">${c.rounds} tur • ${c.differentWinners} farklı kazanan</div></div>
-    </div>`;
+    </div>
+    <h3 class="sech">Kazananlar — kim, nerede kazandı</h3>` + table(["Pilot", "Takım", "Galibiyet", "Kazanılan yarışlar"],
+      c.winners.filter((w) => matchQ(w.name, w.code, w.team)).map((w) =>
+        `<tr><td><b>${esc(w.code)}</b> ${esc(w.name)}</td><td>${esc(w.team)}</td><td class="pts">${w.wins}</td><td>${w.races.map((r) => `<span class="racechip">R${r.round} ${esc(r.name.replace(" Grand Prix", ""))}</span>`).join("")}</td></tr>`));
     stat = `${S.season} sezonu özeti`;
   } else if (S.tab === "bingo") {
     html = `<div id="bingoGrid" class="bingo"></div><div class="bingoBar"><span id="bingoCount"></span><button id="bingoAdd">+ Olay ekle</button><button id="bingoReset">Sıfırla</button></div>`;

@@ -249,6 +249,17 @@ export const getRound = (d, round) => d.rounds.find((r) => r.round === Number(ro
 export function getChampions(data) {
   const dw = computeTable(data, { who: "drivers", metric: "real" })[0];
   const cw = computeTable(data, { who: "teams", metric: "real" })[0];
-  const winners = new Set(data.rounds.map((r) => r.winner && r.winner.id).filter(Boolean));
-  return { driver: dw, team: cw, rounds: data.rounds.length, differentWinners: winners.size };
+  const wm = new Map();
+  for (const r of data.rounds) {
+    if (!r.winner) continue;
+    if (!wm.has(r.winner.id)) {
+      wm.set(r.winner.id, { id: r.winner.id, code: r.winner.code, name: r.winner.name, team: r.winner.team, wins: 0, races: [] });
+    }
+    const w = wm.get(r.winner.id);
+    w.team = r.winner.team;
+    w.wins++;
+    w.races.push({ round: r.round, name: r.name });
+  }
+  const winners = [...wm.values()].sort((a, b) => b.wins - a.wins);
+  return { driver: dw, team: cw, rounds: data.rounds.length, differentWinners: winners.length, winners };
 }
