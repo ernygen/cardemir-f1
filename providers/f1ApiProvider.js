@@ -88,6 +88,7 @@ function computeRound(roundNo, name, date, rows, sprint = false) {
     if (pos === 1) winner = { id: r.Driver.driverId, code: code(r), name: fullName(r), team: r.Constructor.name, teamId: r.Constructor.constructorId };
     classified.push({
       id: r.Driver.driverId, code: code(r), name: fullName(r),
+      given: r.Driver.givenName, family: r.Driver.familyName,
       team: r.Constructor.name, teamId: r.Constructor.constructorId,
       wiki: r.Driver.url || null,
       grid: effGrid, gridRaw: String(r.grid), finish: pos, status: r.status,
@@ -223,7 +224,7 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
     if (rd.seq > upto) continue;
     for (const d of rd.drivers) {
       if (!agg.has(d.id)) {
-        agg.set(d.id, { id: d.id, code: d.code, name: d.name, team: d.team, teamId: d.teamId, wiki: d.wiki || null, value: 0, wins: 0, swins: 0 });
+        agg.set(d.id, { id: d.id, code: d.code, name: d.name, given: d.given, family: d.family, team: d.team, teamId: d.teamId, wiki: d.wiki || null, value: 0, wins: 0, swins: 0 });
       }
       const a = agg.get(d.id);
       a.team = d.team; a.teamId = d.teamId;

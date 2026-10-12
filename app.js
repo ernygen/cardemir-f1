@@ -1,6 +1,6 @@
 import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js";
 import * as api from "./providers/f1ApiProvider.js";
-import { driverPhoto, teamCarPhoto, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki } from "./assets.js";
+import { teamCarPhoto, teamCarPhotoYear, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki, f1Headshot } from "./assets.js";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
@@ -104,25 +104,35 @@ function avgQF(d, id) {
   return [a(gS, gN), a(fS, fN)];
 }
 
-// Driver photo: 2026 F1 cutout when mapped, else Wikipedia portrait (every year)
+// Driver photo: universal F1 headshot (~2014+, correct per-year kit via name pattern),
+// else Wikipedia portrait. Works every season, no per-year mapping.
+// Team visuals: F1 CDN when the team is mapped (2026 logos/cars reused every year, 2024-25 cars year-aware),
+// else Wikipedia (every year)
 const photoFor = (x, cls) => {
-  const f1 = driverPhoto(x.code);
+  const f1 = f1Headshot(x.given, x.family, x.id);
   return f1 ? imgTag(f1, x.name, cls) : wikiImg(x.wiki, cls, x.name);
 };
-// Team visuals: 2026 F1 CDN when the team is mapped, else Wikipedia (every year)
 const teamImgFor = (d, id, name, cls, kind) => {
-  if (hasTeam(id)) return imgTag(kind === "car" ? teamCarPhoto(id) : teamLogo(id), name, cls);
+  if (hasTeam(id)) {
+    if (kind === "car") {
+      const yc = teamCarPhotoYear(d.season, id);
+      if (yc) return imgTag(yc, name, cls);
+      return imgTag(teamCarPhoto(id), name, cls);
+    }
+    return imgTag(teamLogo(id), name, cls);
+  }
   const art = d.teamWiki && d.teamWiki[id];
   return kind === "car" ? wikiImg(art, cls, name) : wikiLogoImg(art, cls, name);
 };
 
-// Result rows: mapped team logo, else driver portrait, else 3-letter code (+ name)
+// Result rows: mapped team logo, else F1 headshot, else Wikipedia portrait, else code (+ name)
 function drvResult(x) {
   if (hasTeam(x.teamId)) {
     const logo = imgTag(teamLogo(x.teamId), x.name, "logo sm");
     if (logo) return `<span class="who">${logo}<span>${esc(x.name)}</span></span>`;
   } else {
-    const ph = wikiImg(x.wiki, "dphoto sm", x.name);
+    const f1 = f1Headshot(x.given, x.family, x.id);
+    const ph = f1 ? imgTag(f1, x.name, "dphoto sm") : wikiImg(x.wiki, "dphoto sm", x.name);
     if (ph) return `<span class="who">${ph}<span>${esc(x.name)}</span></span>`;
   }
   return `<b>${esc(x.code)}</b> ${esc(x.name)}`;

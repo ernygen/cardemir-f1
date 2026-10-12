@@ -18,26 +18,42 @@ export const TEAM_META = {
   cadillac:     { slug: "cadillac",      color: "#909090" },
 };
 
-// driver code -> [team slug, driver slug] (formula1.com/en/drivers 2026)
-const DRIVER_SLUG = {
-  RUS: ["mercedes", "georus"], ANT: ["mercedes", "andant"],
-  LEC: ["ferrari", "chalec"], HAM: ["ferrari", "lewham"],
-  NOR: ["mclaren", "lannor"], PIA: ["mclaren", "oscpia"],
-  VER: ["redbullracing", "maxver"], HAD: ["redbullracing", "isahad"],
-  LAW: ["racingbulls", "lialaw"], LIN: ["racingbulls", "arvlin"],
-  GAS: ["alpine", "piegas"], COL: ["alpine", "fracol"],
-  OCO: ["haasf1team", "estoco"], BEA: ["haasf1team", "olibea"],
-  HUL: ["audi", "nichul"], BOR: ["audi", "gabbor"],
-  SAI: ["williams", "carsai"], ALB: ["williams", "alealb"],
-  ALO: ["astonmartin", "feralo"], STR: ["astonmartin", "lanstr"],
-  PER: ["cadillac", "serper"], BOT: ["cadillac", "valbot"],
-};
+// (driver cutouts removed — universal f1Headshot below covers every season)
 
-export function driverPhoto(code) {
-  const s = DRIVER_SLUG[code];
-  if (!s) return null;
-  const [team, drv] = s;
-  return `${IMG}/c_lfill,w_440/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/${VER}/common/f1/2026/${team}/${drv}01/2026${team}${drv}01right.webp`;
+// Universal F1 headshot (real photos for the 2014+ era):
+// content/dam/fom-website/drivers/{AD}/{ADSOY01_AD_SOYAD}/{adsoy}01.png
+function asciiFold(s) {
+  return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+function lettersOnly(s) {
+  return asciiFold(s).replace(/[^A-Za-z]/g, "");
+}
+export function f1Headshot(given, family, driverId) {
+  // Name collisions (same slug would match two drivers)
+  if (driverId === "mick_schumacher") {
+    return `${IMG}/d_driver_fallback_image.png/content/dam/fom-website/drivers/M/MICSCH02_Mick_Schumacher/micsch02.png.transform/1col/image.png`;
+  }
+  const g = lettersOnly(given).slice(0, 3).toUpperCase();
+  const f = lettersOnly(family).slice(0, 3).toUpperCase();
+  if (!g || !f) return null;
+  const slug = g + f + "01";
+  const disp = asciiFold(given).trim().replace(/\s+/g, "_").replace(/[^A-Za-z_]/g, "")
+    + "_" + asciiFold(family).trim().replace(/\s+/g, "_").replace(/[^A-Za-z_]/g, "");
+  return `${IMG}/d_driver_fallback_image.png/content/dam/fom-website/drivers/${g[0]}/${slug}_${disp}/${slug.toLowerCase()}.png.transform/1col/image.png`;
+}
+
+// 2024/2025 cars: same pattern, year-specific team slugs (hash-verified)
+const YEAR_TEAM_SLUG = {
+  2024: { rb: "rb", audi: "kicksauber", haas: "haas" },
+  2025: { rb: "racingbulls", audi: "kicksauber", haas: "haasf1team" },
+};
+export function teamCarPhotoYear(year, constructorId) {
+  const base = (TEAM_META[constructorId] || {}).slug;
+  if (!base) return null;
+  const y = Number(year);
+  if (!(y === 2024 || y === 2025)) return null;
+  const slug = ((YEAR_TEAM_SLUG[y] || {})[constructorId]) || base;
+  return `${IMG}/c_lfill,w_320/q_auto/d_common:f1:2026:fallback:car:2026fallbackcarright.webp/${VER}/common/f1/${y}/${slug}/${y}${slug}carright.webp`;
 }
 
 export const hasTeam = (id) => Boolean(TEAM_META[id]);
