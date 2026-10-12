@@ -1,50 +1,184 @@
-// F1 API provider (HAZIR İSKELET — yarın devreye alınacak).
-// Arayüz excelProvider.js ile BİREBİR aynı olmalı: loadData, getDriverStandings, getTeamStandings, getRaceResult.
-// Şu an örnek olarak Jolpica F1 API (Ergast devamı) kullanılıyor.
-//
-// Geçiş adımları:
-//  1. config.js içinde DATA_SOURCE = "f1api" yap
-//  2. Aşağıdaki loadData içini gerçek API'ye bağla
-//  3. Excel kolon isimlerin (AUS, CHN...) ile API pist kodlarını eşleştir (mapping tablosu)
+// F1 API provider — Jolpica (Ergast devamı).
+// Excel'den veri alınmaz; Excel sadece konsepttir.
+// Bu modül takvim + yarış sonuçlarını API'den çeker,
+// Cardemir özel şampiyonalarını (PG/PGNN/PGC/PGNS/Ters/QR) kendisi hesaplar.
 
-const JOLPICA = "https://api.jolpi.ca/ergast/f1";
+const BASE = "https://api.jolpi.ca/ergast/f1";
+const PAGE = 100;
 
-// Excel'deki kısa kod -> API'deki round no (2026 sezonu örneği, kendi takvimine göre düzelt)
-const RACE_MAP = {
-  AUS: 1, CHN: 2, JPN: 3, BAH: 4, MIA: 6, CAN: 9, MON: 10,
-  // ... geri kalanını takvimine göre ekle
+export const PGC_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const CLASSIFIED = new Set(["Finished", "Lapped"]);
+
+async function fetchJson(path) {
+  const res = await fetch(BASE + path, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+  return res.json();
+}
+
+// Jolpica sayfalamayı satır bazında yapar (limit max 100), turlar bölünebilir.
+// Bu yüzden tüm satırları toplayıp tura göre biz gruplarız.
+async function fetchAllRows(path) {
+  const rows = [];
+  let offset = 0;
+  for (;;) {
+    const json = await fetchJson(`${path}?limit=${PAGE}&offset=${offset}`);
+    const table = json.MRData.RaceTable;
+    for (const race of table.Races) {
+      const key = path.includes("results") ? "Results" : "QualifyingResults";
+      for (const row of race[key] || []) rows.push({ round: Number(race.round), row });
+    }
+    const total = Number(json.MRData.total);
+    offset += PAGE;
+    if (offset >= total || (table.Races.length === 0)) break;
+  }
+  return rows;
+}
+
+const num = (v) => {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? n : null;
 };
+const pts = (v) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const isClassified = (status) => CLASSIFIED.has(status);
 
-export async function loadData() {
-  // ÖRNEK: 2026 pilot klasmanı (Jolpica formatı)
-  // const res = await fetch(`${JOLPICA}/2026/driverStandings.json`);
-  // const json = await res.json();
-  // const rows = json.MRData.StandingsTable.StandingsLists[0].DriverStandings;
-  // return {
-  //   source: "f1api:jolpica",
-  //   generatedAt: new Date().toISOString(),
-  //   races: Object.keys(RACE_MAP),
-  //   teamRaces: Object.keys(RACE_MAP),
-  //   drivers: rows.map(d => ({
-  //     number: d.Driver.permanentNumber,
-  //     name: `${d.Driver.givenName} ${d.Driver.familyName}`,
-  //     results: {},      // istersen round bazında doldur
-  //     total: Number(d.points),
-  //   })),
-  //   teams: [],          // constructorStandings.json ile doldur
-  // };
-  throw new Error("f1ApiProvider henüz bağlanmadı — config.js içinde DATA_SOURCE='excel' olarak bırak.");
+function fullName(d) {
+  return `${d.Driver.givenName} ${d.Driver.familyName}`;
+}
+function code(d) {
+  return d.Driver.code || d.Driver.familyName.slice(0, 3).toUpperCase();
 }
 
-export function getDriverStandings(data) {
-  return [...data.drivers].sort((a, b) => b.total - a.total);
+// Bir tur için özel şampiyona hesapları
+function computeRound(roundNo, name, date, rows) {
+  const classified = [];
+  let maxGrid = 0;
+  for (const r of rows) {
+    const g = num(r.grid);
+    if (g !== null && g > maxGrid) maxGrid = g;
+  }
+  const plGrid = maxGrid + 1; // grid "0"/PL ile başlayanlar en arkadan sayılır
+  let winner = null;
+  for (const r of rows) {
+    const pos = num(r.position);
+    const grid = num(r.grid);
+    const ok = isClassified(r.status) && pos !== null;
+    const effGrid = grid !== null && grid > 0 ? grid : plGrid;
+    if (pos === 1) winner = { id: r.Driver.driverId, code: code(r), name: fullName(r), team: r.Constructor.name };
+    classified.push({
+      id: r.Driver.driverId, code: code(r), name: fullName(r),
+      team: r.Constructor.name, teamId: r.Constructor.constructorId,
+      grid: effGrid, gridRaw: String(r.grid), finish: pos, status: r.status,
+      realPoints: pts(r.points), classified: ok,
+      gain: ok ? effGrid - pos : null,
+    });
+  }
+  const cls = classified.filter((d) => d.classified);
+  // PG sırası: kazanç desc, eşitlikte gerçek finiş önde
+  const byGain = [...cls].sort((a, b) => b.gain - a.gain || a.finish - b.finish);
+
+  // PGC: splitli — eşit kazançlar slot puanlarını bölüşür
+  const pgcSplit = new Map();
+  let i = 0;
+  while (i < byGain.length && i < PGC_POINTS.length) {
+    let j = i;
+    while (j < byGain.length && byGain[j].gain === byGain[i].gain) j++;
+    const end = Math.min(j, PGC_POINTS.length);
+    const pool = PGC_POINTS.slice(i, end).reduce((a, b) => a + b, 0);
+    const each = pool / (end - i);
+    for (let k = i; k < end; k++) pgcSplit.set(byGain[k].id, each);
+    i = j;
+  }
+  // PGNS: splitsiz — sıra puanını direkt alır
+  const pgns = new Map();
+  byGain.slice(0, PGC_POINTS.length).forEach((d, k) => pgns.set(d.id, PGC_POINTS[k]));
+
+  // Ters: klasmanı sondan başa puanla (sonuncu 25), DNF'sizler yok
+  const byReverse = [...cls].sort((a, b) => b.finish - a.finish);
+  const ters = new Map();
+  byReverse.slice(0, PGC_POINTS.length).forEach((d, k) => ters.set(d.id, PGC_POINTS[k]));
+
+  return { round: roundNo, name, date, winner, drivers: classified, byGain, pgcSplit, pgns, ters };
 }
 
-export function getTeamStandings(data) {
-  return [...data.teams].sort((a, b) => b.total - a.total);
+export async function loadSeason(year) {
+  const schedJson = await fetchJson(`/${year}.json`);
+  const schedule = (schedJson.MRData.RaceTable.Races || []).map((r) => ({
+    round: Number(r.round), name: r.raceName, date: r.date, circuit: r.Circuit.circuitName,
+  }));
+  const [resRows] = await Promise.all([fetchAllRows(`/${year}/results.json`)]);
+  const byRound = new Map();
+  for (const { round, row } of resRows) {
+    if (!byRound.has(round)) byRound.set(round, []);
+    byRound.get(round).push(row);
+  }
+  const schedByRound = new Map(schedule.map((s) => [s.round, s]));
+  const rounds = [...byRound.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([round, rows]) => {
+      const s = schedByRound.get(round) || {};
+      return computeRound(round, s.name || `Round ${round}`, s.date || "", rows);
+    });
+
+  const drivers = new Map();
+  const teams = new Map();
+  for (const rd of rounds) {
+    for (const d of rd.drivers) {
+      if (!drivers.has(d.id)) {
+        drivers.set(d.id, {
+          id: d.id, code: d.code, name: d.name, team: d.team, teamId: d.teamId,
+          points: 0, wins: 0, pg: 0, pgnn: 0, pgc: 0, pgns: 0, ters: 0,
+        });
+      }
+      const D = drivers.get(d.id);
+      D.team = d.team; D.teamId = d.teamId;
+      D.points += d.realPoints;
+      if (d.finish === 1) D.wins++;
+      if (d.gain !== null) {
+        D.pg += d.gain;
+        D.pgnn += Math.max(0, d.gain);
+      }
+      D.pgc += rd.pgcSplit.get(d.id) || 0;
+      D.pgns += rd.pgns.get(d.id) || 0;
+      D.ters += rd.ters.get(d.id) || 0;
+
+      if (!teams.has(d.teamId)) teams.set(d.teamId, { id: d.teamId, name: d.team, points: 0, wins: 0, pgc: 0, pgns: 0, ters: 0 });
+      const T = teams.get(d.teamId);
+      T.name = d.team;
+      T.points += d.realPoints;
+      if (d.finish === 1) T.wins++;
+      T.pgc += rd.pgcSplit.get(d.id) || 0;
+      T.pgns += rd.pgns.get(d.id) || 0;
+      T.ters += rd.ters.get(d.id) || 0;
+    }
+  }
+  return {
+    source: `f1api:${year}`, season: year, schedule, rounds,
+    completed: rounds.length,
+    drivers: [...drivers.values()], teams: [...teams.values()],
+  };
 }
 
-export function getRaceResult(data, race, type = "drivers") {
-  const list = type === "drivers" ? data.drivers : data.teams;
-  return list.map((x) => ({ name: x.name, number: x.number, value: x.results[race] ?? null, total: x.total }));
+export async function loadSeasonsList() {
+  const json = await fetchJson("/seasons.json?limit=100");
+  return json.MRData.SeasonTable.Seasons.map((s) => s.season);
+}
+
+const by = (k) => (a, b) => b[k] - a[k];
+export const getDriverStandings = (d) => [...d.drivers].sort((a, b) => b.points - a.points || b.wins - a.wins);
+export const getTeamStandings = (d) => [...d.teams].sort((a, b) => b.points - a.points || b.wins - a.wins);
+export const getPG = (d, nn = false) => [...d.drivers].sort(by(nn ? "pgnn" : "pg"));
+export const getPGC = (d, split = true) => [...d.drivers].sort(by(split ? "pgc" : "pgns"));
+export const getTers = (d) => [...d.drivers].sort(by("ters"));
+export const getTeamPGC = (d, split = true) => [...d.teams].sort(by(split ? "pgc" : "pgns"));
+export const getTeamTers = (d) => [...d.teams].sort(by("ters"));
+export const getRound = (d, round) => d.rounds.find((r) => r.round === Number(round));
+
+export function getChampions(data) {
+  const dw = getDriverStandings(data)[0];
+  const cw = getTeamStandings(data)[0];
+  const winners = new Set(data.rounds.map((r) => r.winner && r.winner.id).filter(Boolean));
+  return { driver: dw, team: cw, rounds: data.rounds.length, differentWinners: winners.size };
 }

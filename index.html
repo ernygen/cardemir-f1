@@ -3,48 +3,37 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>F126 — Excel'den Beslenen F1 Sitesi (API'ye Hazır)</title>
+<title>Cardemir F1 — Canlı Şampiyonalar</title>
 <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
 <header>
-  <div class="logo">🏁 F126 <span id="sourceBadge" title="Veri kaynağı">EXCEL</span></div>
-  <div class="tabs">
-    <button id="tabDrivers" class="active">Pilotlar</button>
-    <button id="tabTeams">Takımlar</button>
+  <div class="logo">🏁 Cardemir F1 <span id="sourceBadge">F1 API</span></div>
+  <div class="seasonbox">
+    <label for="season">Sezon</label>
+    <select id="season"></select>
   </div>
 </header>
-
+<nav id="tabs"></nav>
 <main>
   <section class="controls">
     <input id="search" type="search" placeholder="Pilot / takım ara..." />
-    <select id="raceFilter"><option value="">Tüm sezon (toplam puan)</option></select>
-    <button id="refresh" title="data.json'u tekrar yükle">↻ Yenile</button>
+    <select id="roundFilter"></select>
   </section>
-
-  <section class="meta">
-    <span id="statLine">yükleniyor...</span>
-    <span id="updated"></span>
-  </section>
-
-  <section>
-    <table>
-      <thead><tr id="headRow"></tr></thead>
-      <tbody id="bodyRows"></tbody>
-    </table>
-  </section>
-
+  <section class="meta"><span id="statLine">yükleniyor...</span><span id="updated"></span></section>
+  <section id="content"></section>
   <details class="how">
-    <summary>Nasıl çalışıyor? Excel → site → F1 API geçişi</summary>
-    <ol>
-      <li><b>Şimdi:</b> <code>python excel_to_json.py</code> komutu <code>F126.xlsx</code> dosyasını okuyup <code>data.json</code> üretir. Site sadece bu JSON'u okur.</li>
-      <li>Excel güncellenince scripti tekrar çalıştır + sayfayı yenile. Bu kadar.</li>
-      <li><b>Yarın:</b> <code>config.js</code> içinde <code>DATA_SOURCE = "f1api"</code> yap. <code>providers/f1ApiProvider.js</code> içindeki örnek Jolpica kodunu aç. Arayüz kodu değişmez.</li>
-    </ol>
-    <p class="warn">Not: Drivers/Teams sheet'lerinde sadece ilk blok okunur (ilk boş satıra kadar). Altaki kümülatif/motor blokları bilerek atlanır.</p>
+    <summary>Kurallar</summary>
+    <ul>
+      <li><b>QR:</b> yarış başlangıç gridi → yarış sonucu.</li>
+      <li><b>PG:</b> grid − finiş (pozisyon kazancı). <b>PGNN:</b> negatifler 0 sayılır.</li>
+      <li><b>PGC:</b> her tur en çok kazanan 10 pilota 25-18-15… puanı; eşitlikte slot puanları bölüşülür, eşitlik bozma gerçek finişe göre.</li>
+      <li><b>PGNS:</b> aynı ama bölüşmesiz, direkt sıra puanı.</li>
+      <li><b>Ters:</b> klasmanı bitirenler sondan başa puanlanır (sonuncu 25), DNF'ler yok.</li>
+      <li>Veri: Jolpica F1 API (canlı takvim + sonuçlar). Sprintler v1'de yok.</li>
+    </ul>
   </details>
 </main>
-
 <script type="module" src="./app.js"></script>
 </body>
 </html>

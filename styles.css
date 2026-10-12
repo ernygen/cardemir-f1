@@ -1,25 +1,35 @@
 :root { --bg:#0b0e13; --card:#151b24; --line:#232c3b; --txt:#e8edf3; --mut:#8b96a8; --acc:#e10600; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--txt); font-family:Segoe UI, Arial, sans-serif; }
-header { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; background:#111720; border-bottom:2px solid var(--acc); position:sticky; top:0; }
+header { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; background:#111720; border-bottom:2px solid var(--acc); position:sticky; top:0; z-index:5; }
 .logo { font-size:22px; font-weight:800; }
 .logo span { font-size:11px; background:var(--acc); padding:3px 8px; border-radius:20px; vertical-align:middle; margin-left:8px; }
-.tabs button { background:transparent; color:var(--txt); border:1px solid var(--line); padding:8px 16px; border-radius:8px; cursor:pointer; margin-left:8px; }
-.tabs button.active { background:var(--acc); border-color:var(--acc); }
+.seasonbox { display:flex; align-items:center; gap:8px; color:var(--mut); font-size:14px; }
+nav#tabs { display:flex; gap:8px; overflow-x:auto; padding:10px 20px; background:#111720; border-bottom:1px solid var(--line); position:sticky; top:61px; z-index:4; }
+nav#tabs button { flex:0 0 auto; background:transparent; color:var(--txt); border:1px solid var(--line); padding:8px 14px; border-radius:8px; cursor:pointer; }
+nav#tabs button.active { background:var(--acc); border-color:var(--acc); }
 main { max-width:900px; margin:0 auto; padding:18px; }
 .controls { display:flex; gap:10px; margin-bottom:10px; }
-.controls input, .controls select { flex:1; padding:10px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--txt); }
+.controls input, .controls select, .seasonbox select { padding:10px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--txt); }
+.controls input, .controls select { flex:1; }
 .controls button { padding:10px 14px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--txt); cursor:pointer; }
 .meta { color:var(--mut); font-size:13px; display:flex; justify-content:space-between; margin:8px 2px 12px; }
 table { width:100%; border-collapse:collapse; background:var(--card); border-radius:12px; overflow:hidden; }
 th, td { padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; }
 th { color:var(--mut); font-size:12px; text-transform:uppercase; }
 tbody tr:hover { background:#1c2431; }
-.pos { width:44px; font-weight:800; }
+.pos { width:56px; font-weight:800; }
 .pts { font-weight:800; }
-.pill { display:inline-block; min-width:52px; text-align:center; padding:3px 8px; border-radius:6px; background:#0e1420; border:1px solid var(--line); }
-.pill.dns, .pill.dnf { color:#ffb020; border-color:#5a4413; }
+.mut { color:var(--mut); }
 .how { margin-top:18px; color:var(--mut); font-size:14px; }
-.how code { color:var(--txt); background:#0e1420; padding:1px 6px; border-radius:6px; }
-.warn { color:#ffb020; }
-@media (max-width:600px){ header{flex-direction:column; gap:10px;} .controls{flex-direction:column;} }
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+.card .ct { color:var(--mut); font-size:12px; text-transform:uppercase; }
+.card .cb { font-size:20px; margin:6px 0; }
+.card .cm { color:var(--mut); font-size:13px; }
+.bingo { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+.tile { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:22px 14px; text-align:center; cursor:pointer; font-weight:600; }
+.tile.on { background:#0f3d1e; border-color:#1f7a3d; text-decoration:line-through; }
+.bingoBar { display:flex; gap:10px; align-items:center; margin-top:12px; color:var(--mut); }
+.bingoBar button { padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--txt); cursor:pointer; }
+@media (max-width:600px){ header{flex-direction:column; gap:10px;} .controls{flex-direction:column;} nav#tabs{top:105px;} }
