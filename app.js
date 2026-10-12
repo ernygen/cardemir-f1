@@ -93,6 +93,20 @@ function medalClass(finish) {
   return finish === 1 ? "m1" : finish === 2 ? "m2" : finish === 3 ? "m3" : "";
 }
 
+// Pilotun sezonluk ortalama grid / finişi (PGC toplam tablosu için)
+function avgQF(d, id) {
+  let gS = 0, gN = 0, fS = 0, fN = 0;
+  for (const ev of d.events) {
+    const row = ev.drivers.find((y) => y.id === id);
+    if (!row) continue;
+    const raw = String(row.gridRaw);
+    if (/^\d+$/.test(raw) && Number(raw) > 0) { gS += Number(raw); gN++; }
+    if (row.classified) { fS += row.finish; fN++; }
+  }
+  const a = (s, n) => n ? (Math.round(s / n * 10) / 10) : "–";
+  return [a(gS, gN), a(fS, fN)];
+}
+
 // Sonuç tablolarında 3 harf kod yerine takım logosu (+ isim)
 function drvResult(x) {
   const logo = PHOTOS() ? imgTag(teamLogo(x.teamId), x.name, "logo sm") : "";
@@ -244,27 +258,41 @@ function render() {
     if (R) {
       const map = isPts ? (split ? R.pgcSplit : R.pgns) : null;
       const list = R.byGain.filter((x) => (!map || map.has(x.id)) && matchQ(x.name, x.code));
-      html = table(isPts ? ["#", "Pilot", "Kazanç", "Puan"] : ["#", "Pilot", "Grid → Finiş", short],
+      html = table(isPts ? ["#", "Pilot", "Grid → Finiş", "Kazanç", "Puan"] : ["#", "Pilot", "Grid → Finiş", short],
         list.map((x, i) => {
           const v = isPts ? map.get(x.id) : mode === "pgnn" ? Math.max(0, x.gain) : x.gain;
           const vCell = isPts ? fmtPts(v) : (v > 0 ? "+" : "") + v;
-          const mid = isPts ? `<td>+${x.gain}</td>` : `<td>${x.grid} → ${x.finish}</td>`;
+          const mid = isPts ? `<td>${x.grid} → ${x.finish}</td><td>+${x.gain}</td>` : `<td>${x.grid} → ${x.finish}</td>`;
           return `<tr><td class="pos">${i + 1}</td><td>${drvResult(x)}</td>${mid}<td class="pts">${vCell}</td></tr>`;
         }));
       stat = `${R.name} • ${label}`;
     } else if (d.events.length >= 2) {
       const rows = api.tableWithChanges(d, { who: "drivers", metric, split }).filter((x) => matchQ(x.name, x.code));
       const map = isPts ? (split ? lastEv.pgcSplit : lastEv.pgns) : null;
-      const left = table(["#", "Pilot", short], lastEv.byGain.filter((x) => !map || map.has(x.id)).slice(0, 10).map((x, i) => {
-        const v = isPts ? map.get(x.id) : mode === "pgnn" ? Math.max(0, x.gain) : x.gain;
-        const vCell = isPts ? fmtPts(v) : (v > 0 ? "+" : "") + v;
-        return `<tr><td class="pos">${i + 1}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td class="pts">${vCell}</td></tr>`;
+      // PG/PGNN sol panel: tüm grid (klasman dışı en altta); PGC/PGNS: sadece puan alanlar
+      const fullGrid = [...lastEv.drivers].sort((a, b) => (b.gain ?? -999) - (a.gain ?? -999));
+      const leftList = isPts
+        ? lastEv.byGain.filter((x) => map.has(x.id))
+        : fullGrid;
+      const left = table(isPts ? ["#", "Pilot", "Grid → Finiş", "Puan"] : ["#", "Pilot", "Grid → Finiş", short], leftList.map((x, i) => {
+        const gf = `${x.grid} → ${x.finish ?? (x.status === "Did not start" ? "DNS" : "DNF")}`;
+        let vCell;
+        if (isPts) vCell = fmtPts(map.get(x.id));
+        else if (x.gain === null || x.gain === undefined) vCell = `<span class="mut">–</span>`;
+        else { const v = mode === "pgnn" ? Math.max(0, x.gain) : x.gain; vCell = (v > 0 ? "+" : "") + v; }
+        return `<tr><td class="pos">${i + 1}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td>${gf}</td><td class="pts">${vCell}</td></tr>`;
       }));
-      const right = table(["#", "Δ", "Pilot", "Takım", short],
-        rows.map((x) => {
-          const vCell = isPts ? fmtPts(x.value) : (x.value > 0 ? "+" : "") + x.value;
-          return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td>${esc(x.team)}</td><td class="pts">${vCell}</td></tr>`;
-        }));
+      const right = isPts
+        ? table(["#", "Δ", "Pilot", "Takım", "ORT Q", "ORT R", short],
+          rows.map((x) => {
+            const [oq, of] = avgQF(d, x.id);
+            return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td>${esc(x.team)}</td><td>${oq}</td><td>${of}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
+          }))
+        : table(["#", "Δ", "Pilot", "Takım", short],
+          rows.map((x) => {
+            const vCell = (x.value > 0 ? "+" : "") + x.value;
+            return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td>${esc(x.team)}</td><td class="pts">${vCell}</td></tr>`;
+          }));
       html = splitView(lastEv, left, right);
       stat = `${rows.length} pilot • ${label} • oklar bir önceki olaya göre`;
     } else {
