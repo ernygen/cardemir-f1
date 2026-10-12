@@ -44,8 +44,8 @@ tbody tr:hover { background:#faf7f4; }
 .mut { color:var(--mut); }
 .who { display:flex; align-items:center; gap:10px; }
 .tbar { display:inline-block; width:5px; align-self:stretch; min-height:30px; border-radius:2px; margin-right:2px; }
-.dphoto { width:64px; height:40px; object-fit:cover; object-position:top; border-radius:6px; background:#ece7e1; }
-.dphoto.sm { width:46px; height:32px; }
+.dphoto { width:46px; height:60px; object-fit:cover; object-position:top center; border-radius:6px; background:#ece7e1; flex:0 0 auto; }
+.dphoto.sm { width:38px; height:48px; }
 img.wiload { background:#ece7e1; }
 img.wiload:not([src]) { visibility:hidden; }
 .trackimg { width:100%; height:100%; object-fit:cover; display:block; }
@@ -61,7 +61,7 @@ img.wiload:not([src]) { visibility:hidden; }
 .m3 { background:linear-gradient(135deg,#e0a878,#b5713e); color:#fff; font-weight:900; border-radius:6px; }
 .logo.sm { width:44px; height:26px; }
 .newtag { background:var(--acc); color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:10px; white-space:nowrap; }
-.cardphoto { width:100%; max-height:150px; object-fit:cover; object-position:top; border-radius:8px; background:#ece7e1; margin-bottom:8px; }
+.cardphoto { width:120px; height:150px; object-fit:cover; object-position:top center; border-radius:8px; background:#ece7e1; margin-bottom:8px; }
 .card .cb { display:flex; align-items:center; gap:10px; }
 .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
 .card { background:var(--card); border:1px solid var(--line); border-top:5px solid var(--acc); border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
@@ -95,4 +95,4 @@ img.wiload:not([src]) { visibility:hidden; }
 footer { text-align:center; color:var(--mut); font-size:12px; padding:18px; }
 @media (max-width:900px){ .split{grid-template-columns:1fr;} .trackgrid{grid-template-columns:repeat(2,1fr);} }
 @media (max-width:600px){ .trackgrid{grid-template-columns:1fr;} }
-@media (max-width:600px){ header{flex-direction:column; gap:10px;} .controls{flex-direction:column;} nav#tabs{top:104px;} .dphoto{width:48px;height:32px;} .carphoto{display:none;} }
+@media (max-width:600px){ header{flex-direction:column; gap:10px;} .controls{flex-direction:column;} nav#tabs{top:104px;} .dphoto{width:40px;height:52px;} .carphoto{display:none;} }
