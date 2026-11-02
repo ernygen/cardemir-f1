@@ -1,4 +1,4 @@
-// Driver photos: F1 CDN cutout when the driver is in the 2026 lineup, else Wikipedia portrait.
+// Driver photos: 2026 F1 CDN cutout for 2026 lineup, else universal F1 headshot (~2014+), else Wikipedia portrait.
 // Team logo/car: 2026 F1 CDN when mapped, else Wikipedia. Track cards: F1 scenic when mapped.
 const IMG = "https://media.formula1.com/image/upload";
 const VER = "v1740000001";
@@ -18,7 +18,52 @@ export const TEAM_META = {
   cadillac:     { slug: "cadillac",      color: "#909090" },
 };
 
-// (driver cutouts removed — universal f1Headshot below covers every season)
+// driver code / driverId -> [team slug, driver slug] (formula1.com/en/drivers 2026)
+export const DRIVER_2026 = {
+  RUS: ["mercedes", "georus"], ANT: ["mercedes", "andant"],
+  LEC: ["ferrari", "chalec"], HAM: ["ferrari", "lewham"],
+  NOR: ["mclaren", "lannor"], PIA: ["mclaren", "oscpia"],
+  VER: ["redbullracing", "maxver"], HAD: ["redbullracing", "isahad"],
+  LAW: ["racingbulls", "lialaw"], LIN: ["racingbulls", "arvlin"],
+  GAS: ["alpine", "piegas"], COL: ["alpine", "fracol"],
+  OCO: ["haasf1team", "estoco"], BEA: ["haasf1team", "olibea"],
+  HUL: ["audi", "nichul"], BOR: ["audi", "gabbor"],
+  SAI: ["williams", "carsai"], ALB: ["williams", "alealb"],
+  ALO: ["astonmartin", "feralo"], STR: ["astonmartin", "lanstr"],
+  PER: ["cadillac", "serper"], BOT: ["cadillac", "valbot"],
+  // Jolpica/Ergast driverId aliases
+  russell: ["mercedes", "georus"], antonelli: ["mercedes", "andant"],
+  leclerc: ["ferrari", "chalec"], hamilton: ["ferrari", "lewham"],
+  norris: ["mclaren", "lannor"], piastri: ["mclaren", "oscpia"],
+  max_verstappen: ["redbullracing", "maxver"], hadjar: ["redbullracing", "isahad"],
+  lawson: ["racingbulls", "lialaw"], lindblad: ["racingbulls", "arvlin"],
+  gasly: ["alpine", "piegas"], colapinto: ["alpine", "fracol"],
+  ocon: ["haasf1team", "estoco"], bearman: ["haasf1team", "olibea"],
+  hulkenberg: ["audi", "nichul"], bortoleto: ["audi", "gabbor"],
+  sainz: ["williams", "carsai"], albon: ["williams", "alealb"],
+  alonso: ["astonmartin", "feralo"], stroll: ["astonmartin", "lanstr"],
+  perez: ["cadillac", "serper"], bottas: ["cadillac", "valbot"],
+};
+
+export const hasDriver2026 = (idOrCode) => {
+  if (!idOrCode) return false;
+  return Boolean(
+    DRIVER_2026[idOrCode] ||
+    DRIVER_2026[String(idOrCode).toUpperCase()] ||
+    DRIVER_2026[String(idOrCode).toLowerCase()]
+  );
+};
+
+export function driverPhoto(idOrCode) {
+  if (!idOrCode) return null;
+  const s = DRIVER_2026[idOrCode] ||
+    DRIVER_2026[String(idOrCode).toUpperCase()] ||
+    DRIVER_2026[String(idOrCode).toLowerCase()];
+  if (!s) return null;
+  const [team, drv] = s;
+  return `${IMG}/c_lfill,w_440/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/${VER}/common/f1/2026/${team}/${drv}01/2026${team}${drv}01right.webp`;
+}
+export const driverPhoto2026 = driverPhoto;
 
 // Universal F1 headshot (real photos for the 2014+ era):
 // content/dam/fom-website/drivers/{AD}/{ADSOY01_AD_SOYAD}/{adsoy}01.png

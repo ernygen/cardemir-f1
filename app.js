@@ -1,6 +1,6 @@
 import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js";
 import * as api from "./providers/f1ApiProvider.js";
-import { teamCarPhoto, teamCarPhotoYear, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki, f1Headshot } from "./assets.js";
+import { driverPhoto, teamCarPhoto, teamCarPhotoYear, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki, f1Headshot } from "./assets.js";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
@@ -104,12 +104,13 @@ function avgQF(d, id) {
   return [a(gS, gN), a(fS, fN)];
 }
 
-// Driver photo: universal F1 headshot (~2014+, correct per-year kit via name pattern),
-// else Wikipedia portrait. Works every season, no per-year mapping.
+// Driver photo: 2026 F1 cutout for drivers in the 2026 lineup,
+// else universal F1 headshot (~2014+), else Wikipedia portrait.
 // Team visuals: F1 CDN when the team is mapped (2026 logos/cars reused every year, 2024-25 cars year-aware),
 // else Wikipedia (every year)
 const photoFor = (x, cls) => {
-  const f1 = f1Headshot(x.given, x.family, x.id);
+  const d26 = driverPhoto(x.code) || driverPhoto(x.id);
+  const f1 = d26 || f1Headshot(x.given, x.family, x.id);
   return f1 ? imgTag(f1, x.name, cls) : wikiImg(x.wiki, cls, x.name);
 };
 const teamImgFor = (d, id, name, cls, kind) => {
@@ -125,13 +126,14 @@ const teamImgFor = (d, id, name, cls, kind) => {
   return kind === "car" ? wikiImg(art, cls, name) : wikiLogoImg(art, cls, name);
 };
 
-// Result rows: mapped team logo, else F1 headshot, else Wikipedia portrait, else code (+ name)
+// Result rows: mapped team logo, else 2026 photo, else F1 headshot, else Wikipedia portrait, else code (+ name)
 function drvResult(x) {
   if (hasTeam(x.teamId)) {
     const logo = imgTag(teamLogo(x.teamId), x.name, "logo sm");
     if (logo) return `<span class="who">${logo}<span>${esc(x.name)}</span></span>`;
   } else {
-    const f1 = f1Headshot(x.given, x.family, x.id);
+    const d26 = driverPhoto(x.code) || driverPhoto(x.id);
+    const f1 = d26 || f1Headshot(x.given, x.family, x.id);
     const ph = f1 ? imgTag(f1, x.name, "dphoto sm") : wikiImg(x.wiki, "dphoto sm", x.name);
     if (ph) return `<span class="who">${ph}<span>${esc(x.name)}</span></span>`;
   }
