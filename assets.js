@@ -45,20 +45,23 @@ export const DRIVER_2026 = {
   perez: ["cadillac", "serper"], bottas: ["cadillac", "valbot"],
 };
 
-export const hasDriver2026 = (idOrCode) => {
-  if (!idOrCode) return false;
-  return Boolean(
-    DRIVER_2026[idOrCode] ||
-    DRIVER_2026[String(idOrCode).toUpperCase()] ||
-    DRIVER_2026[String(idOrCode).toLowerCase()]
-  );
+// Local overrides or custom driver cutouts
+const LOCAL_DRIVER_PHOTO = {
+  HIR: "./hirakawa.png",
+  hirakawa: "./hirakawa.png",
+  ryo_hirakawa: "./hirakawa.png",
 };
+
+export const hasDriver2026 = (idOrCode) => Boolean(driverPhoto(idOrCode));
 
 export function driverPhoto(idOrCode) {
   if (!idOrCode) return null;
-  const s = DRIVER_2026[idOrCode] ||
-    DRIVER_2026[String(idOrCode).toUpperCase()] ||
-    DRIVER_2026[String(idOrCode).toLowerCase()];
+  const key = String(idOrCode).trim();
+  const up = key.toUpperCase();
+  const low = key.toLowerCase();
+  const local = LOCAL_DRIVER_PHOTO[key] || LOCAL_DRIVER_PHOTO[up] || LOCAL_DRIVER_PHOTO[low];
+  if (local) return local;
+  const s = DRIVER_2026[key] || DRIVER_2026[up] || DRIVER_2026[low];
   if (!s) return null;
   const [team, drv] = s;
   return `${IMG}/c_lfill,w_440/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/${VER}/common/f1/2026/${team}/${drv}01/2026${team}${drv}01right.webp`;
