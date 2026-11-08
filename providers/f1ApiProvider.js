@@ -70,19 +70,34 @@ function code(d) {
 }
 
 // Custom championship math for one event (8-point scale for sprints)
-function computeRound(roundNo, name, date, rows, sprint = false) {
+function computeRound(roundNo, name, date, rows, sprint = false, qualiRows = []) {
   const PTS = sprint ? SPRINT_POINTS : PGC_POINTS;
+  const qualiMap = new Map();
+  for (const q of (qualiRows || [])) {
+    const drvId = q.Driver?.driverId;
+    const p = num(q.position);
+    if (drvId && p !== null) qualiMap.set(drvId, p);
+  }
+
   const classified = [];
   let maxGrid = 0;
   for (const r of rows) {
-    const g = num(r.grid);
+    let g = num(r.grid);
+    if (g === null && qualiMap.has(r.Driver?.driverId)) {
+      g = qualiMap.get(r.Driver?.driverId);
+    }
     if (g !== null && g > maxGrid) maxGrid = g;
   }
   const plGrid = maxGrid + 1; // "0"/PL starters count from the back
   let winner = null;
   for (const r of rows) {
     const pos = num(r.position);
-    const grid = num(r.grid);
+    let grid = num(r.grid);
+    let rawGrid = r.grid;
+    if (grid === null && qualiMap.has(r.Driver?.driverId)) {
+      grid = qualiMap.get(r.Driver?.driverId);
+      rawGrid = String(grid);
+    }
     const ok = isClassified(r.status) && pos !== null;
     const effGrid = grid !== null && grid > 0 ? grid : plGrid;
     if (pos === 1) winner = { id: r.Driver.driverId, code: code(r), name: fullName(r), team: r.Constructor.name, teamId: r.Constructor.constructorId };
@@ -91,7 +106,7 @@ function computeRound(roundNo, name, date, rows, sprint = false) {
       given: r.Driver.givenName, family: r.Driver.familyName,
       team: r.Constructor.name, teamId: r.Constructor.constructorId,
       wiki: r.Driver.url || null,
-      grid: effGrid, gridRaw: String(r.grid), finish: pos, status: r.status,
+      grid: effGrid, gridRaw: String(rawGrid ?? ""), finish: pos, status: r.status,
       realPoints: pts(r.points), classified: ok,
       gain: ok ? effGrid - pos : null,
     });
@@ -130,9 +145,10 @@ export async function loadSeason(year) {
     round: Number(r.round), name: r.raceName, date: r.date,
     circuit: r.Circuit.circuitName, circuitId: r.Circuit.circuitId, wiki: r.Circuit.url || null,
   }));
-  const [resRows, sprintRows] = await Promise.all([
+  const [resRows, sprintRows, qualiRows] = await Promise.all([
     fetchAllRows(`/${year}/results.json`),
     fetchAllRows(`/${year}/sprint.json`).catch(() => []),
+    fetchAllRows(`/${year}/qualifying.json`).catch(() => []),
   ]);
   const group = (rows) => {
     const m = new Map();
@@ -143,6 +159,7 @@ export async function loadSeason(year) {
     return m;
   };
   const schedByRound = new Map(schedule.map((s) => [s.round, s]));
+  const qualiByRound = group(qualiRows);
   // Team Wikipedia links (for old-season images)
   const teamWiki = {};
   for (const { row } of [...resRows, ...sprintRows]) {
@@ -153,7 +170,8 @@ export async function loadSeason(year) {
     .sort((a, b) => a[0] - b[0])
     .map(([round, rows]) => {
       const s = schedByRound.get(round) || {};
-      const ev = computeRound(round, s.name || `Round ${round}`, s.date || "", rows);
+      const qRows = qualiByRound.get(round) || [];
+      const ev = computeRound(round, s.name || `Round ${round}`, s.date || "", rows, false, qRows);
       ev.key = String(round); ev.sprint = false; ev.seq = round * 2;
       return ev;
     });
