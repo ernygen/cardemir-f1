@@ -1,6 +1,18 @@
 // Aramco Power Rankings (2026)
-// Scale: 25, 18, 15, 12, 10, 8, 6, 4, 2, 1
+// Scale: Linearly distributed from 25 to 1 among all entered drivers
 export const POWER_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+
+export function calculatePowerPoints(count) {
+  if (!count || count <= 0) return [];
+  if (count === 1) return [25];
+  const step = 24 / (count - 1);
+  const pts = [];
+  for (let i = 0; i < count; i++) {
+    const val = 25 - i * step;
+    pts.push(Math.round(val * 10) / 10);
+  }
+  return pts;
+}
 
 // Default built-in rankings (fallback when nothing in localStorage)
 export const DEFAULT_POWER_RANKINGS = {
@@ -115,11 +127,20 @@ export function parsePowerInput(text, allDrivers = []) {
       score,
     });
   }
-  // Sort descending by score if scores are provided
-  if (items.some((x) => x.score !== null && x.score !== undefined)) {
-    items.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+  // Deduplicate by id if entered multiple times, keeping the first
+  const seen = new Set();
+  const uniqueItems = [];
+  for (const it of items) {
+    if (!seen.has(it.id)) {
+      seen.add(it.id);
+      uniqueItems.push(it);
+    }
   }
-  return items;
+  // Sort descending by score if scores are provided
+  if (uniqueItems.some((x) => x.score !== null && x.score !== undefined)) {
+    uniqueItems.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+  }
+  return uniqueItems;
 }
 
 // Format items back to text for the editor (e.g. "norris 9,8")

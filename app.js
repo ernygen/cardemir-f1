@@ -371,26 +371,27 @@ function render() {
             const ph = photoFor(x, "dphoto");
             return `<tr><td class="pos ${medalClass(x.rank)}">P${x.rank}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.score !== null ? x.score : "-"}</td><td class="pts">${fmtPts(x.pts)}</td></tr>`;
           }));
-        stat = `${R.name} • Power Rankings (top 10)`;
+        stat = `${R.name} • Power Rankings (${list.length} drivers)`;
       } else {
         html = editor + `<div class="card"><div class="cb">No Power Rankings for ${esc(R.name)}</div><div class="cm">Yukarıdaki menüden pilotları ve notları girip kaydedebilirsiniz.</div></div>`;
         stat = `${R.name} • No Power Rankings data yet`;
       }
     } else {
       const rows = api.tableWithChanges(d, { who: "drivers", metric: "power" }).filter((x) => matchQ(x.name, x.code, x.team));
-      const hasAny = rows.some((x) => x.value > 0);
-      const right = table(["#", "Δ", "Driver", "Team", "Wins", "Pts"],
+      const hasAny = rows.some((x) => x.value > 0 || (x.scoreCount || 0) > 0);
+      const right = table(["#", "Δ", "Driver", "Team", "Ortalama", "Wins", "Total Puan"],
         rows.map((x) => {
           const bar = `<span class="tbar" style="background:${teamColor(x.teamId)}"></span>`;
           const ph = photoFor(x, "dphoto");
-          return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
+          const avgStr = x.avgScore !== null && x.avgScore !== undefined ? x.avgScore.toFixed(2) : "-";
+          return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td><b>${avgStr}</b></td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
         }));
 
       const lastWithPower = [...d.rounds].reverse().find((r) => r.powerList && r.powerList.length);
       if (lastWithPower) {
-        const top = lastWithPower.powerList.slice(0, 10);
+        const list = lastWithPower.powerList.filter((x) => matchQ(x.name, x.code, x.team));
         const left = table(["Rank", "Driver", "Score", "Pts"],
-          top.map((x) => {
+          list.map((x) => {
             const ph = photoFor(x, "dphoto sm");
             return `<tr><td class="pos ${medalClass(x.rank)}">P${x.rank}</td><td><span class="who">${ph}<span><b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${x.score !== null ? x.score : "-"}</td><td class="pts">${fmtPts(x.pts)}</td></tr>`;
           }));
@@ -467,7 +468,7 @@ function powerEditorHtml(d, R) {
         <span id="prStatusMsg" class="powerMsg"></span>
       </div>
       <div class="powerHint">
-        Her satıra bir pilot ve notunu yazın (örn: <code>norris 9,8</code> veya <code>NOR 9.8</code>). Sıralama puana göre otomatik yapılır ve ilk 10 pilota sırasıyla 25-18-15-12-10-8-6-4-2-1 puanı verilir.
+        Her satıra bir pilot ve notunu yazın (örn: <code>norris 9,8</code> veya <code>NOR 9.8</code>). Girilen tüm pilotlar nota göre sıralanır ve 25'ten 1'e kadar puanlar eşit basamaklarla dağıtılır.
       </div>
       <textarea id="prInput" class="powerTextarea" placeholder="Örnek:
 norris 9,8

@@ -3,7 +3,7 @@
 // This module fetches calendar + race results from the API
 // and computes the Cardemir custom championships (PG/PGNN/PGC/PGNS/Ters/QR) itself.
 
-import { getPowerRankings, POWER_POINTS } from "../powerRankings.js";
+import { getPowerRankings, calculatePowerPoints } from "../powerRankings.js";
 
 const BASE = "https://api.jolpi.ca/ergast/f1";
 const PAGE = 100;
@@ -250,7 +250,12 @@ export function applyPowerRankings(data, year = "2026") {
           d.id === codeOrId ||
           d.code?.toUpperCase() === String(codeOrId).toUpperCase() ||
           d.id?.toLowerCase() === String(codeOrId).toLowerCase()
-        );
+        ) || (data.drivers && data.drivers.find((d) =>
+          d.code === codeOrId ||
+          d.id === codeOrId ||
+          d.code?.toUpperCase() === String(codeOrId).toUpperCase() ||
+          d.id?.toLowerCase() === String(codeOrId).toLowerCase()
+        ));
         return {
           id: found ? found.id : String(codeOrId).toLowerCase(),
           code: found ? found.code : String(codeOrId).toUpperCase(),
@@ -265,18 +270,23 @@ export function applyPowerRankings(data, year = "2026") {
         };
       });
 
+      // Sort descending by score if scores are provided
+      if (resolved.some((x) => x.score !== null && x.score !== undefined)) {
+        resolved.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+      }
+
+      const rawPoints = calculatePowerPoints(resolved.length);
       let pi = 0;
-      while (pi < resolved.length && pi < POWER_POINTS.length) {
+      while (pi < resolved.length) {
         let pj = pi;
         if (resolved[pi].score !== null && resolved[pi].score !== undefined) {
           while (pj < resolved.length && resolved[pj].score === resolved[pi].score) pj++;
         } else {
           pj = pi + 1;
         }
-        const end = Math.min(pj, POWER_POINTS.length);
-        const pool = POWER_POINTS.slice(pi, end).reduce((a, b) => a + b, 0);
-        const each = pool / (end - pi);
-        for (let pk = pi; pk < end; pk++) {
+        const pool = rawPoints.slice(pi, pj).reduce((a, b) => a + b, 0);
+        const each = pool / (pj - pi);
+        for (let pk = pi; pk < pj; pk++) {
           power.set(resolved[pk].id, each);
           powerList.push({ ...resolved[pk], rank: pi + 1, pts: each });
         }
@@ -295,13 +305,37 @@ export async function loadSeasonsList() {
   return json.MRData.SeasonTable.Seasons.map((s) => s.season);
 }
 
-// Cumulative table up to an event. metric: real|pg|pgnn|pgc|ters
+// Cumulative table up to an event. metric: real|pg|pgnn|pgc|ters|power
 // (pgns = metric pgc + split:false). upto: last included event seq (Infinity = all).
 // GPs + sprints computed together (sprint is a separate event).
 export function computeTable(data, { who = "drivers", metric = "real", upto = Infinity, split = true } = {}) {
   const agg = new Map();
   for (const rd of data.events) {
     if (rd.seq > upto) continue;
+    if (metric === "power") {
+      if (rd.powerList && rd.powerList.length) {
+        for (const pr of rd.powerList) {
+          if (!agg.has(pr.id)) {
+            agg.set(pr.id, {
+              id: pr.id, code: pr.code, name: pr.name, given: pr.given || "", family: pr.family || "",
+              team: pr.team || "", teamId: pr.teamId || "", wiki: pr.wiki || null,
+              value: 0, wins: 0, swins: 0, scoreSum: 0, scoreCount: 0, avgScore: null,
+            });
+          }
+          const a = agg.get(pr.id);
+          if (pr.team) { a.team = pr.team; a.teamId = pr.teamId; }
+          if (!a.wiki && pr.wiki) a.wiki = pr.wiki;
+          const pts = (rd.power && rd.power.get(pr.id)) || 0;
+          a.value += pts;
+          if (rd.powerWinner === pr.id) a.wins++;
+          if (pr.score !== null && pr.score !== undefined) {
+            a.scoreSum += pr.score;
+            a.scoreCount++;
+          }
+        }
+      }
+      continue;
+    }
     for (const d of rd.drivers) {
       if (!agg.has(d.id)) {
         agg.set(d.id, { id: d.id, code: d.code, name: d.name, given: d.given, family: d.family, team: d.team, teamId: d.teamId, wiki: d.wiki || null, value: 0, wins: 0, swins: 0 });
@@ -314,33 +348,62 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
       else if (metric === "pgnn") { if (d.gain !== null) a.value += Math.max(0, d.gain); }
       else if (metric === "pgc") { a.value += (split ? rd.pgcSplit : rd.pgns).get(d.id) || 0; }
       else if (metric === "ters") { a.value += rd.ters.get(d.id) || 0; }
-      else if (metric === "power") { a.value += (rd.power && rd.power.get(d.id)) || 0; if (rd.powerWinner === d.id) a.wins++; }
     }
   }
+
+  if (metric === "power") {
+    for (const a of agg.values()) {
+      a.avgScore = a.scoreCount > 0 ? (a.scoreSum / a.scoreCount) : null;
+    }
+  }
+
   let arr = [...agg.values()];
   if (metric === "real") arr.sort((a, b) => b.value - a.value || b.wins - a.wins);
+  else if (metric === "power") arr.sort((a, b) => b.value - a.value || (b.avgScore ?? 0) - (a.avgScore ?? 0) || b.wins - a.wins);
   else arr.sort((a, b) => b.value - a.value);
+
   if (who === "teams") {
     // Teams: credited to the round's team (a mid-season mover's old points
     // stay with the old team — e.g. Lawson's Red Bull points).
     const t = new Map();
     const add = (teamId, name, v, win) => {
-      if (!t.has(teamId)) t.set(teamId, { id: teamId, name, value: 0, wins: 0 });
+      if (!t.has(teamId)) t.set(teamId, { id: teamId, name, value: 0, wins: 0, scoreSum: 0, scoreCount: 0, avgScore: null });
       const T = t.get(teamId);
       T.name = name; T.value += v; T.wins += win ? 1 : 0;
     };
     for (const rd of data.events) {
       if (rd.seq > upto) continue;
+      if (metric === "power") {
+        if (rd.powerList && rd.powerList.length) {
+          for (const pr of rd.powerList) {
+            if (pr.teamId) {
+              add(pr.teamId, pr.team, (rd.power && rd.power.get(pr.id)) || 0, rd.powerWinner === pr.id);
+              const T = t.get(pr.teamId);
+              if (T && pr.score !== null && pr.score !== undefined) {
+                T.scoreSum += pr.score;
+                T.scoreCount++;
+              }
+            }
+          }
+        }
+        continue;
+      }
       for (const d of rd.drivers) {
         if (metric === "real") add(d.teamId, d.team, d.realPoints, d.finish === 1 && !rd.sprint);
         else if (metric === "pg" && d.gain !== null) add(d.teamId, d.team, d.gain, false);
         else if (metric === "pgnn" && d.gain !== null) add(d.teamId, d.team, Math.max(0, d.gain), false);
         else if (metric === "pgc") add(d.teamId, d.team, (split ? rd.pgcSplit : rd.pgns).get(d.id) || 0, false);
         else if (metric === "ters") add(d.teamId, d.team, rd.ters.get(d.id) || 0, false);
-        else if (metric === "power") add(d.teamId, d.team, (rd.power && rd.power.get(d.id)) || 0, rd.powerWinner === d.id);
       }
     }
-    arr = [...t.values()].sort((a, b) => b.value - a.value || b.wins - a.wins);
+    if (metric === "power") {
+      for (const T of t.values()) {
+        T.avgScore = T.scoreCount > 0 ? (T.scoreSum / T.scoreCount) : null;
+      }
+      arr = [...t.values()].sort((a, b) => b.value - a.value || (b.avgScore ?? 0) - (a.avgScore ?? 0) || b.wins - a.wins);
+    } else {
+      arr = [...t.values()].sort((a, b) => b.value - a.value || b.wins - a.wins);
+    }
   }
   return arr;
 }
