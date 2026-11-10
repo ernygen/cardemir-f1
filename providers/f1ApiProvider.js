@@ -308,7 +308,7 @@ export async function loadSeasonsList() {
 // Cumulative table up to an event. metric: real|pg|pgnn|pgc|ters|power
 // (pgns = metric pgc + split:false). upto: last included event seq (Infinity = all).
 // GPs + sprints computed together (sprint is a separate event).
-export function computeTable(data, { who = "drivers", metric = "real", upto = Infinity, split = true } = {}) {
+export function computeTable(data, { who = "drivers", metric = "real", upto = Infinity, split = true, powerSort = "pts" } = {}) {
   const agg = new Map();
   for (const rd of data.events) {
     if (rd.seq > upto) continue;
@@ -329,7 +329,7 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
           a.value += pts;
           if (rd.powerWinner === pr.id) a.wins++;
           if (pr.score !== null && pr.score !== undefined) {
-            a.scoreSum += pr.score;
+            a.scoreSum = Math.round(((a.scoreSum || 0) + pr.score) * 100) / 100;
             a.scoreCount++;
           }
         }
@@ -359,8 +359,15 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
 
   let arr = [...agg.values()];
   if (metric === "real") arr.sort((a, b) => b.value - a.value || b.wins - a.wins);
-  else if (metric === "power") arr.sort((a, b) => b.value - a.value || (b.avgScore ?? 0) - (a.avgScore ?? 0) || b.wins - a.wins);
-  else arr.sort((a, b) => b.value - a.value);
+  else if (metric === "power") {
+    if (powerSort === "avg") {
+      arr.sort((a, b) => (b.avgScore ?? -1) - (a.avgScore ?? -1) || b.value - a.value || (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || b.wins - a.wins);
+    } else if (powerSort === "score") {
+      arr.sort((a, b) => (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || (b.avgScore ?? -1) - (a.avgScore ?? -1) || b.value - a.value || b.wins - a.wins);
+    } else {
+      arr.sort((a, b) => b.value - a.value || (b.avgScore ?? -1) - (a.avgScore ?? -1) || (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || b.wins - a.wins);
+    }
+  } else arr.sort((a, b) => b.value - a.value);
 
   if (who === "teams") {
     // Teams: credited to the round's team (a mid-season mover's old points
@@ -380,7 +387,7 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
               add(pr.teamId, pr.team, (rd.power && rd.power.get(pr.id)) || 0, rd.powerWinner === pr.id);
               const T = t.get(pr.teamId);
               if (T && pr.score !== null && pr.score !== undefined) {
-                T.scoreSum += pr.score;
+                T.scoreSum = Math.round(((T.scoreSum || 0) + pr.score) * 100) / 100;
                 T.scoreCount++;
               }
             }
@@ -400,7 +407,13 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
       for (const T of t.values()) {
         T.avgScore = T.scoreCount > 0 ? (T.scoreSum / T.scoreCount) : null;
       }
-      arr = [...t.values()].sort((a, b) => b.value - a.value || (b.avgScore ?? 0) - (a.avgScore ?? 0) || b.wins - a.wins);
+      if (powerSort === "avg") {
+        arr = [...t.values()].sort((a, b) => (b.avgScore ?? -1) - (a.avgScore ?? -1) || b.value - a.value || (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || b.wins - a.wins);
+      } else if (powerSort === "score") {
+        arr = [...t.values()].sort((a, b) => (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || (b.avgScore ?? -1) - (a.avgScore ?? -1) || b.value - a.value || b.wins - a.wins);
+      } else {
+        arr = [...t.values()].sort((a, b) => b.value - a.value || (b.avgScore ?? -1) - (a.avgScore ?? -1) || (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || b.wins - a.wins);
+      }
     } else {
       arr = [...t.values()].sort((a, b) => b.value - a.value || b.wins - a.wins);
     }

@@ -18,7 +18,7 @@ const PG_MODES = [
 ];
 const ROUND_TABS = new Set(["qr", "pg", "ters", "power"]);
 const cache = new Map();
-let S = { season: DEFAULT_SEASON, tab: "drivers", round: "", pgmode: "pg", q: "", data: null, loading: false };
+let S = { season: DEFAULT_SEASON, tab: "drivers", round: "", pgmode: "pg", powerSort: "pts", q: "", data: null, loading: false };
 let PR_SELECTED_ROUND = null;
 let PR_EDITOR_OPEN = true;
 
@@ -54,6 +54,16 @@ async function boot() {
   $("roundFilter").onchange = () => { S.round = $("roundFilter").value; render(); };
   $("pgMode").innerHTML = PG_MODES.map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
   $("pgMode").onchange = () => { S.pgmode = $("pgMode").value; render(); };
+  const POWER_SORTS = [
+    ["pts", "Sırala: Toplam Puan (25-1)"],
+    ["avg", "Sırala: Ortalama Not"],
+    ["score", "Sırala: Toplam Not"],
+  ];
+  const pSort = $("powerSort");
+  if (pSort) {
+    pSort.innerHTML = POWER_SORTS.map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
+    pSort.onchange = () => { S.powerSort = pSort.value; render(); };
+  }
   await refresh();
 }
 
@@ -77,6 +87,11 @@ function fillRounds() {
   const sel = $("roundFilter");
   const pgm = $("pgMode");
   pgm.style.display = S.tab === "pg" ? "" : "none";
+  const pSort = $("powerSort");
+  if (pSort) {
+    pSort.style.display = (S.tab === "power" && !S.round) ? "" : "none";
+    pSort.value = S.powerSort || "pts";
+  }
   const show = ROUND_TABS.has(S.tab);
   sel.style.display = show ? "" : "none";
   if (!show) return;
@@ -377,15 +392,42 @@ function render() {
         stat = `${R.name} • No Power Rankings data yet`;
       }
     } else {
-      const rows = api.tableWithChanges(d, { who: "drivers", metric: "power" }).filter((x) => matchQ(x.name, x.code, x.team));
+      const sort = S.powerSort || "pts";
+      const rows = api.tableWithChanges(d, { who: "drivers", metric: "power", powerSort: sort }).filter((x) => matchQ(x.name, x.code, x.team));
       const hasAny = rows.some((x) => x.value > 0 || (x.scoreCount || 0) > 0);
-      const right = table(["#", "Δ", "Driver", "Team", "Ortalama", "Wins", "Total Puan"],
-        rows.map((x) => {
-          const bar = `<span class="tbar" style="background:${teamColor(x.teamId)}"></span>`;
-          const ph = photoFor(x, "dphoto");
-          const avgStr = x.avgScore !== null && x.avgScore !== undefined ? x.avgScore.toFixed(2) : "-";
-          return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td><b>${avgStr}</b></td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
-        }));
+
+      const sortBar = `
+        <div class="powerSortBar">
+          <span class="powerSortLabel">Sıralama:</span>
+          <button class="powerSortBtn ${sort === "pts" ? "active" : ""}" data-sort="pts">🏆 Toplam Puan (25-1)</button>
+          <button class="powerSortBtn ${sort === "avg" ? "active" : ""}" data-sort="avg">⭐ Ortalama Not</button>
+          <button class="powerSortBtn ${sort === "score" ? "active" : ""}" data-sort="score">📊 Toplam Not</button>
+        </div>
+      `;
+
+      const thSort = (col, label) => {
+        const isActive = sort === col;
+        return `<span class="${isActive ? "sortActive" : "sortable"}" data-sort="${col}">${label}${isActive ? ` <span class="sortArrow">▼</span>` : ""}</span>`;
+      };
+
+      const tableHtml = table([
+        "#",
+        "Δ",
+        "Driver",
+        "Team",
+        thSort("avg", "Ortalama"),
+        thSort("score", "Toplam Not"),
+        "Wins",
+        thSort("pts", "Toplam Puan"),
+      ], rows.map((x) => {
+        const bar = `<span class="tbar" style="background:${teamColor(x.teamId)}"></span>`;
+        const ph = photoFor(x, "dphoto");
+        const avgStr = x.avgScore !== null && x.avgScore !== undefined ? x.avgScore.toFixed(2) : "-";
+        const scoreStr = x.scoreCount > 0 ? (Number.isInteger(x.scoreSum) ? String(x.scoreSum) : x.scoreSum.toFixed(1)) : "-";
+        return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td ${sort === "avg" ? 'class="colActive"' : ""}><b>${avgStr}</b></td><td ${sort === "score" ? 'class="colActive"' : ""}><b>${scoreStr}</b></td><td>${x.wins}</td><td class="pts ${sort === "pts" ? "colActive" : ""}">${fmtPts(x.value)}</td></tr>`;
+      }));
+
+      const right = sortBar + tableHtml;
 
       const lastWithPower = [...d.rounds].reverse().find((r) => r.powerList && r.powerList.length);
       if (lastWithPower) {
@@ -424,7 +466,21 @@ function render() {
   $("content").innerHTML = html;
   $("statLine").textContent = stat;
   if (S.tab === "bingo") initBingo();
-  if (S.tab === "power") initPowerEditor(d);
+  if (S.tab === "power") {
+    initPowerEditor(d);
+    document.querySelectorAll(".powerSortBtn, [data-sort]").forEach((el) => {
+      el.onclick = (e) => {
+        e.stopPropagation();
+        const s = el.dataset.sort;
+        if (s && s !== S.powerSort) {
+          S.powerSort = s;
+          const pSel = $("powerSort");
+          if (pSel) pSel.value = s;
+          render();
+        }
+      };
+    });
+  }
   hydrateWiki($("content"));
   const tg = document.querySelector("#content .trackgrid");
   if (tg) tg.onclick = (e) => {

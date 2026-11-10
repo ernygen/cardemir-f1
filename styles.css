@@ -113,6 +113,16 @@ img.wiload:not([src]) { visibility:hidden; }
 .powerMsg.err { color:#c00; }
 .powerHint { font-size:12px; color:var(--mut); margin-bottom:8px; line-height:1.4; }
 .powerHint code { background:#ece7e1; padding:2px 6px; border-radius:4px; font-size:11px; }
+.powerSortBar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.powerSortLabel { font-size:12px; font-weight:800; color:var(--mut); text-transform:uppercase; letter-spacing:.5px; }
+.powerSortBtn { padding:6px 12px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--text); font-family:var(--head); font-size:12px; font-weight:700; cursor:pointer; transition:all .15s ease; }
+.powerSortBtn:hover { border-color:var(--acc); background:#fdf2f2; }
+.powerSortBtn.active { background:var(--acc); color:#fff; border-color:var(--acc); }
+th .sortable { cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:3px; }
+th .sortable:hover { text-decoration:underline; color:var(--acc); }
+th .sortActive { color:var(--acc); cursor:pointer; font-weight:900; user-select:none; display:inline-flex; align-items:center; gap:3px; }
+th .sortArrow { font-size:9px; }
+td.colActive { background:rgba(255,24,1,.04); font-weight:700; }
 footer { text-align:center; color:var(--mut); font-size:12px; padding:18px; }
 @media (max-width:900px){ .split{grid-template-columns:1fr;} .trackgrid{grid-template-columns:repeat(2,1fr);} }
 @media (max-width:600px){ .trackgrid{grid-template-columns:1fr;} }
