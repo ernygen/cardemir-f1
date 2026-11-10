@@ -3,6 +3,8 @@
 // This module fetches calendar + race results from the API
 // and computes the Cardemir custom championships (PG/PGNN/PGC/PGNS/Ters/QR) itself.
 
+import { getPowerRankings, POWER_POINTS } from "../powerRankings.js";
+
 const BASE = "https://api.jolpi.ca/ergast/f1";
 const PAGE = 100;
 
@@ -70,7 +72,7 @@ function code(d) {
 }
 
 // Custom championship math for one event (8-point scale for sprints)
-function computeRound(roundNo, name, date, rows, sprint = false, qualiRows = []) {
+function computeRound(roundNo, name, date, rows, sprint = false, qualiRows = [], year = "2026") {
   const PTS = sprint ? SPRINT_POINTS : PGC_POINTS;
   const qualiMap = new Map();
   for (const q of (qualiRows || [])) {
@@ -136,7 +138,7 @@ function computeRound(roundNo, name, date, rows, sprint = false, qualiRows = [])
   const ters = new Map();
   byReverse.slice(0, PTS.length).forEach((d, k) => ters.set(d.id, PTS[k]));
 
-  return { round: roundNo, name, date, winner, drivers: classified, byGain, pgcSplit, pgns, ters };
+  return { round: roundNo, name, date, winner, drivers: classified, byGain, pgcSplit, pgns, ters, power: new Map(), powerList: [], powerWinner: null };
 }
 
 export async function loadSeason(year) {
@@ -171,7 +173,7 @@ export async function loadSeason(year) {
     .map(([round, rows]) => {
       const s = schedByRound.get(round) || {};
       const qRows = qualiByRound.get(round) || [];
-      const ev = computeRound(round, s.name || `Round ${round}`, s.date || "", rows, false, qRows);
+      const ev = computeRound(round, s.name || `Round ${round}`, s.date || "", rows, false, qRows, year);
       ev.key = String(round); ev.sprint = false; ev.seq = round * 2;
       return ev;
     });
@@ -220,12 +222,72 @@ export async function loadSeason(year) {
       T.ters += rd.ters.get(d.id) || 0;
     }
   }
-  return {
+  const res = {
     source: `f1api:${year}`, season: year, schedule, rounds, sprints, events, teamWiki,
     sprintRounds: [...sprintSet].sort((a, b) => a - b),
     completed: rounds.length,
     drivers: [...drivers.values()], teams: [...teams.values()],
   };
+  applyPowerRankings(res, year);
+  return res;
+}
+
+export function applyPowerRankings(data, year = "2026") {
+  if (!data || !data.events) return;
+  const allRankings = getPowerRankings(year);
+  for (const ev of data.events) {
+    if (ev.sprint) continue;
+    const prList = allRankings[ev.round] || [];
+    const power = new Map();
+    const powerList = [];
+    let powerWinner = null;
+    if (prList.length) {
+      const resolved = prList.map((item, idx) => {
+        const codeOrId = typeof item === "string" ? item : (item.code || item.id || "");
+        const score = typeof item === "object" && item.score !== undefined ? item.score : null;
+        const found = ev.drivers.find((d) =>
+          d.code === codeOrId ||
+          d.id === codeOrId ||
+          d.code?.toUpperCase() === String(codeOrId).toUpperCase() ||
+          d.id?.toLowerCase() === String(codeOrId).toLowerCase()
+        );
+        return {
+          id: found ? found.id : String(codeOrId).toLowerCase(),
+          code: found ? found.code : String(codeOrId).toUpperCase(),
+          name: found ? found.name : String(codeOrId),
+          team: found ? found.team : "",
+          teamId: found ? found.teamId : "",
+          wiki: found ? found.wiki : null,
+          given: found ? found.given : "",
+          family: found ? found.family : "",
+          score,
+          idx,
+        };
+      });
+
+      let pi = 0;
+      while (pi < resolved.length && pi < POWER_POINTS.length) {
+        let pj = pi;
+        if (resolved[pi].score !== null && resolved[pi].score !== undefined) {
+          while (pj < resolved.length && resolved[pj].score === resolved[pi].score) pj++;
+        } else {
+          pj = pi + 1;
+        }
+        const end = Math.min(pj, POWER_POINTS.length);
+        const pool = POWER_POINTS.slice(pi, end).reduce((a, b) => a + b, 0);
+        const each = pool / (end - pi);
+        for (let pk = pi; pk < end; pk++) {
+          power.set(resolved[pk].id, each);
+          powerList.push({ ...resolved[pk], rank: pi + 1, pts: each });
+        }
+        pi = pj;
+      }
+      if (powerList.length) powerWinner = powerList[0].id;
+    }
+    ev.power = power;
+    ev.powerList = powerList;
+    ev.powerWinner = powerWinner;
+  }
 }
 
 export async function loadSeasonsList() {
@@ -252,6 +314,7 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
       else if (metric === "pgnn") { if (d.gain !== null) a.value += Math.max(0, d.gain); }
       else if (metric === "pgc") { a.value += (split ? rd.pgcSplit : rd.pgns).get(d.id) || 0; }
       else if (metric === "ters") { a.value += rd.ters.get(d.id) || 0; }
+      else if (metric === "power") { a.value += (rd.power && rd.power.get(d.id)) || 0; if (rd.powerWinner === d.id) a.wins++; }
     }
   }
   let arr = [...agg.values()];
@@ -274,6 +337,7 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
         else if (metric === "pgnn" && d.gain !== null) add(d.teamId, d.team, Math.max(0, d.gain), false);
         else if (metric === "pgc") add(d.teamId, d.team, (split ? rd.pgcSplit : rd.pgns).get(d.id) || 0, false);
         else if (metric === "ters") add(d.teamId, d.team, rd.ters.get(d.id) || 0, false);
+        else if (metric === "power") add(d.teamId, d.team, (rd.power && rd.power.get(d.id)) || 0, rd.powerWinner === d.id);
       }
     }
     arr = [...t.values()].sort((a, b) => b.value - a.value || b.wins - a.wins);

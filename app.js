@@ -1,11 +1,13 @@
 import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js";
 import * as api from "./providers/f1ApiProvider.js";
 import { driverPhoto, teamCarPhoto, teamCarPhotoYear, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki, f1Headshot } from "./assets.js";
+import { getPowerRankings, saveRoundPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, parsePowerInput, formatPowerItems } from "./powerRankings.js";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
   ["tracks", "Tracks"], ["drivers", "Drivers' Championship"], ["teams", "Constructors' Championship"],
   ["qr", "Grid / Race"], ["pg", "Position Gain"], ["ters", "Reverse Championship"],
+  ["power", "Power Rankings"],
   ["history", "History"], ["bingo", "Bingo"],
 ];
 const PG_MODES = [
@@ -14,9 +16,11 @@ const PG_MODES = [
   ["pgc", "PGC (split)"],
   ["pgns", "PGNS (no split)"],
 ];
-const ROUND_TABS = new Set(["qr", "pg", "ters"]);
+const ROUND_TABS = new Set(["qr", "pg", "ters", "power"]);
 const cache = new Map();
 let S = { season: DEFAULT_SEASON, tab: "drivers", round: "", pgmode: "pg", q: "", data: null, loading: false };
+let PR_SELECTED_ROUND = null;
+let PR_EDITOR_OPEN = true;
 
 const fmtPts = (v) => Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -356,6 +360,47 @@ function render() {
         rows.map((x, i) => `<tr><td class="pos">${i + 1}</td><td><b>${esc(x.code)}</b> ${esc(x.name)}</td><td>${esc(x.team)}</td><td class="pts">${fmtPts(x.value)}</td></tr>`));
       stat = `${rows.length} drivers • season total`;
     }
+  } else if (S.tab === "power") {
+    const editor = powerEditorHtml(d, R);
+    if (R) {
+      const list = (R.powerList || []).filter((x) => matchQ(x.name, x.code, x.team));
+      if (list.length) {
+        html = editor + table(["Rank", "Driver", "Team", "Score", "Pts"],
+          list.map((x) => {
+            const bar = `<span class="tbar" style="background:${teamColor(x.teamId)}"></span>`;
+            const ph = photoFor(x, "dphoto");
+            return `<tr><td class="pos ${medalClass(x.rank)}">P${x.rank}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.score !== null ? x.score : "-"}</td><td class="pts">${fmtPts(x.pts)}</td></tr>`;
+          }));
+        stat = `${R.name} • Power Rankings (top 10)`;
+      } else {
+        html = editor + `<div class="card"><div class="cb">No Power Rankings for ${esc(R.name)}</div><div class="cm">Yukarıdaki menüden pilotları ve notları girip kaydedebilirsiniz.</div></div>`;
+        stat = `${R.name} • No Power Rankings data yet`;
+      }
+    } else {
+      const rows = api.tableWithChanges(d, { who: "drivers", metric: "power" }).filter((x) => matchQ(x.name, x.code, x.team));
+      const hasAny = rows.some((x) => x.value > 0);
+      const right = table(["#", "Δ", "Driver", "Team", "Wins", "Pts"],
+        rows.map((x) => {
+          const bar = `<span class="tbar" style="background:${teamColor(x.teamId)}"></span>`;
+          const ph = photoFor(x, "dphoto");
+          return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
+        }));
+
+      const lastWithPower = [...d.rounds].reverse().find((r) => r.powerList && r.powerList.length);
+      if (lastWithPower) {
+        const top = lastWithPower.powerList.slice(0, 10);
+        const left = table(["Rank", "Driver", "Score", "Pts"],
+          top.map((x) => {
+            const ph = photoFor(x, "dphoto sm");
+            return `<tr><td class="pos ${medalClass(x.rank)}">P${x.rank}</td><td><span class="who">${ph}<span><b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${x.score !== null ? x.score : "-"}</td><td class="pts">${fmtPts(x.pts)}</td></tr>`;
+          }));
+        html = editor + splitView(lastWithPower, left, right);
+        stat = `${lastWithPower.name} Power Rankings (left) • ${S.season} Championship (right)`;
+      } else {
+        html = editor + (hasAny ? right : `<div class="card"><div class="cb">No Power Rankings entered yet for ${esc(S.season)}</div><div class="cm">Yukarıdaki menüden pilotları ve notları girip kaydedebilirsiniz.</div></div>`);
+        stat = `${S.season} Aramco Power Rankings Championship`;
+      }
+    }
   } else if (S.tab === "history") {
     const c = api.getChampions(d);
     const dph = c.driver ? photoFor(c.driver, "cardphoto") : "";
@@ -378,6 +423,7 @@ function render() {
   $("content").innerHTML = html;
   $("statLine").textContent = stat;
   if (S.tab === "bingo") initBingo();
+  if (S.tab === "power") initPowerEditor(d);
   hydrateWiki($("content"));
   const tg = document.querySelector("#content .trackgrid");
   if (tg) tg.onclick = (e) => {
@@ -390,6 +436,128 @@ function render() {
     [...$("tabs").children].forEach((x) => x.classList.toggle("active", x.dataset.t === "qr"));
     render();
   };
+}
+
+// --- Aramco Power Rankings Editor ---
+function powerEditorHtml(d, R) {
+  const rounds = d.rounds || [];
+  const defaultRound = PR_SELECTED_ROUND || (R ? Number(R.round) : (rounds.length ? rounds[rounds.length - 1].round : 1));
+  PR_SELECTED_ROUND = defaultRound;
+  const allPR = getPowerRankings(S.season);
+  const currentItems = allPR[defaultRound] || [];
+  const textVal = formatPowerItems(currentItems);
+
+  const roundOpts = rounds.map((r) =>
+    `<option value="${r.round}" ${r.round === defaultRound ? "selected" : ""}>R${r.round} - ${esc(r.name)}</option>`
+  ).join("");
+
+  return `
+  <div class="powerEditor">
+    <div class="powerHeader">
+      <div class="powerTitle">⚡ Aramco Power Rankings Girişi</div>
+      <div>
+        <button id="prToggleEditor" class="powerBtnSec">${PR_EDITOR_OPEN ? "▲ Menüyü Gizle" : "▼ Not Gir / Düzenle"}</button>
+      </div>
+    </div>
+    <div id="prEditorBody" style="${PR_EDITOR_OPEN ? "" : "display:none;"}">
+      <div class="powerRow">
+        <label>Yarış / Tur Seç:
+          <select id="prRoundSelect">${roundOpts}</select>
+        </label>
+        <span id="prStatusMsg" class="powerMsg"></span>
+      </div>
+      <div class="powerHint">
+        Her satıra bir pilot ve notunu yazın (örn: <code>norris 9,8</code> veya <code>NOR 9.8</code>). Sıralama puana göre otomatik yapılır ve ilk 10 pilota sırasıyla 25-18-15-12-10-8-6-4-2-1 puanı verilir.
+      </div>
+      <textarea id="prInput" class="powerTextarea" placeholder="Örnek:
+norris 9,8
+verstappen 9,6
+lawson 9,2
+hadjar 8,8
+hulkenberg 8,6
+antonelli 8,4
+russell 8,2
+bearman 8,0
+alonso 7,8
+piastri 7,6">${esc(textVal)}</textarea>
+      <div class="powerActions">
+        <button id="prSaveBtn" class="powerBtnPrimary">💾 Kaydet ve Sıralamayı Güncelle</button>
+        <button id="prClearBtn" class="powerBtnSec">🗑️ Bu Turu Temizle</button>
+        <button id="prResetAllBtn" class="powerBtnDanger">Tümünü Sıfırla</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function initPowerEditor(d) {
+  const roundSel = $("prRoundSelect");
+  const input = $("prInput");
+  const saveBtn = $("prSaveBtn");
+  const clearBtn = $("prClearBtn");
+  const resetBtn = $("prResetAllBtn");
+  const toggleBtn = $("prToggleEditor");
+  const body = $("prEditorBody");
+  const msg = $("prStatusMsg");
+
+  if (toggleBtn && body) {
+    toggleBtn.onclick = () => {
+      PR_EDITOR_OPEN = !PR_EDITOR_OPEN;
+      body.style.display = PR_EDITOR_OPEN ? "" : "none";
+      toggleBtn.textContent = PR_EDITOR_OPEN ? "▲ Menüyü Gizle" : "▼ Not Gir / Düzenle";
+    };
+  }
+
+  if (roundSel && input) {
+    roundSel.onchange = () => {
+      PR_SELECTED_ROUND = Number(roundSel.value);
+      const allPR = getPowerRankings(S.season);
+      input.value = formatPowerItems(allPR[PR_SELECTED_ROUND] || []);
+      if (msg) msg.textContent = "";
+    };
+  }
+
+  if (saveBtn && input && roundSel) {
+    saveBtn.onclick = () => {
+      const rd = Number(roundSel.value);
+      const items = parsePowerInput(input.value, d.drivers || []);
+      if (!items.length) {
+        if (msg) { msg.className = "powerMsg err"; msg.textContent = "Geçerli bir satır girilmedi!"; }
+        return;
+      }
+      saveRoundPowerRankings(S.season, rd, items);
+      api.applyPowerRankings(d, S.season);
+      render();
+      const newMsg = $("prStatusMsg");
+      if (newMsg) {
+        newMsg.className = "powerMsg ok";
+        newMsg.textContent = `✓ R${rd} için ${items.length} pilot kaydedildi! Sıralama güncellendi.`;
+      }
+    };
+  }
+
+  if (clearBtn && roundSel) {
+    clearBtn.onclick = () => {
+      const rd = Number(roundSel.value);
+      clearRoundPowerRankings(S.season, rd);
+      api.applyPowerRankings(d, S.season);
+      render();
+      const newMsg = $("prStatusMsg");
+      if (newMsg) {
+        newMsg.className = "powerMsg ok";
+        newMsg.textContent = `R${rd} temizlendi!`;
+      }
+    };
+  }
+
+  if (resetBtn) {
+    resetBtn.onclick = () => {
+      if (confirm(`${S.season} sezonuna ait tüm manuel Power Rankings kayıtları sıfırlansın mı?`)) {
+        resetAllPowerRankings(S.season);
+        api.applyPowerRankings(d, S.season);
+        render();
+      }
+    };
+  }
 }
 
 // --- Bingo ---

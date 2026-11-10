@@ -92,6 +92,27 @@ img.wiload:not([src]) { visibility:hidden; }
 .bingoBar { display:flex; gap:10px; align-items:center; margin-top:12px; color:var(--mut); }
 .bingoBar button { padding:8px 14px; border-radius:6px; border:1px solid var(--line); background:var(--dark); color:#fff; cursor:pointer; }
 .how { margin-top:18px; color:var(--mut); font-size:14px; }
+.powerEditor { background:var(--card); border:1px solid var(--line); border-top:5px solid #ff1801; border-radius:10px; padding:16px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+.powerHeader { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+.powerTitle { font-family:var(--head); font-weight:900; font-style:italic; text-transform:uppercase; font-size:16px; display:flex; align-items:center; gap:8px; }
+.powerRow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+.powerRow label { font-size:13px; font-weight:700; color:var(--mut); display:flex; align-items:center; gap:6px; }
+.powerRow select { padding:6px 12px; border-radius:6px; border:1px solid var(--line); background:var(--card); font-family:var(--head); font-weight:700; font-size:13px; cursor:pointer; }
+.powerTextarea { width:100%; min-height:120px; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:13px; line-height:1.5; padding:10px; border:1px solid var(--line); border-radius:6px; resize:vertical; box-sizing:border-box; background:#fafafa; color:var(--text); }
+.powerTextarea:focus { outline:none; border-color:var(--acc); background:#fff; }
+.powerActions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+.powerActions button, .powerHeader button { padding:7px 14px; border-radius:6px; border:1px solid var(--line); cursor:pointer; font-weight:700; font-family:var(--head); font-size:12px; text-transform:uppercase; transition:all .15s ease; }
+.powerBtnPrimary { background:var(--acc) !important; color:#fff !important; border-color:var(--acc) !important; }
+.powerBtnPrimary:hover { filter:brightness(1.1); transform:translateY(-1px); }
+.powerBtnSec { background:#ece7e1; color:var(--text); }
+.powerBtnSec:hover { background:#ded7ce; }
+.powerBtnDanger { background:#fff0f0; color:#c00; border-color:#fcc !important; }
+.powerBtnDanger:hover { background:#ffe0e0; }
+.powerMsg { font-size:12px; font-weight:700; margin-left:6px; }
+.powerMsg.ok { color:#1f7a3d; }
+.powerMsg.err { color:#c00; }
+.powerHint { font-size:12px; color:var(--mut); margin-bottom:8px; line-height:1.4; }
+.powerHint code { background:#ece7e1; padding:2px 6px; border-radius:4px; font-size:11px; }
 footer { text-align:center; color:var(--mut); font-size:12px; padding:18px; }
 @media (max-width:900px){ .split{grid-template-columns:1fr;} .trackgrid{grid-template-columns:repeat(2,1fr);} }
 @media (max-width:600px){ .trackgrid{grid-template-columns:1fr;} }

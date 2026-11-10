@@ -13,6 +13,7 @@ The Excel file (`F126.xlsx`) is concept only — no data is taken from it.
 - **Position Gaining Championship (PGC)** — top 10 gainers per event score 25-18-15…; ties split slot points
 - **Position Gaining No Split (PGNS)** — straight positional points, no split
 - **Reverse Championship** — classified finishers scored back-to-front (last gets 25), no DNFs
+- **Power Rankings** — 25-1 points awarded based on Aramco Power Rankings order per Grand Prix
 - **History** — champions of any season 1950–2026 + who-won-where table
 - **Bingo** — WC event cards (click to mark, stored in browser)
 
