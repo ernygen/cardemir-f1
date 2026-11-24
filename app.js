@@ -21,6 +21,15 @@ const cache = new Map();
 let S = { season: DEFAULT_SEASON, tab: "drivers", round: "", pgmode: "pg", powerSort: "pts", q: "", data: null, loading: false };
 let PR_SELECTED_ROUND = null;
 let PR_EDITOR_OPEN = true;
+// Power editor shows only in the owner's browser: open the site once with #admin (#noadmin turns it off).
+// shortcut: a browser flag, not security. Editor saves only touch that browser; shared data changes go through the repo.
+const IS_ADMIN = (() => {
+  try {
+    if (location.hash === "#admin") localStorage.setItem("cardemir_admin", "1");
+    if (location.hash === "#noadmin") localStorage.removeItem("cardemir_admin");
+    return localStorage.getItem("cardemir_admin") === "1";
+  } catch { return false; }
+})();
 
 const fmtPts = (v) => Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -440,7 +449,7 @@ function render() {
       stat = `${rows.length} drivers • season total`;
     }
   } else if (S.tab === "power") {
-    const editor = powerEditorHtml(d, R);
+    const editor = IS_ADMIN ? powerEditorHtml(d, R) : "";
     if (R) {
       const list = (R.powerList || []).filter((x) => matchQ(x.name, x.code, x.team));
       if (list.length) {
@@ -452,7 +461,7 @@ function render() {
           }));
         stat = `${R.name} • Power Rankings (${list.length} drivers)`;
       } else {
-        html = editor + `<div class="card"><div class="cb">No Power Rankings for ${esc(R.name)}</div><div class="cm">Enter drivers and scores in the editor above, then save.</div></div>`;
+        html = editor + `<div class="card"><div class="cb">No Power Rankings for ${esc(R.name)}</div><div class="cm">${IS_ADMIN ? "Enter drivers and scores in the editor above, then save." : "Rankings appear here after each Grand Prix."}</div></div>`;
         stat = `${R.name} • No Power Rankings data yet`;
       }
     } else {
@@ -504,7 +513,7 @@ function render() {
         html = editor + splitView(lastWithPower, left, right);
         stat = `${lastWithPower.name} Power Rankings (left) • ${S.season} Championship (right)`;
       } else {
-        html = editor + (hasAny ? right : `<div class="card"><div class="cb">No Power Rankings entered yet for ${esc(S.season)}</div><div class="cm">Enter drivers and scores in the editor above, then save.</div></div>`);
+        html = editor + (hasAny ? right : `<div class="card"><div class="cb">No Power Rankings entered yet for ${esc(S.season)}</div><div class="cm">${IS_ADMIN ? "Enter drivers and scores in the editor above, then save." : "Rankings appear here after each Grand Prix."}</div></div>`);
         stat = `${S.season} Aramco Power Rankings Championship`;
       }
     }
@@ -528,7 +537,7 @@ function render() {
   $("statLine").textContent = stat;
   if (S.tab === "drivers") initReach();
   if (S.tab === "power") {
-    initPowerEditor(d);
+    if (IS_ADMIN) initPowerEditor(d);
     document.querySelectorAll(".powerSortBtn, [data-sort]").forEach((el) => {
       el.onclick = (e) => {
         e.stopPropagation();
