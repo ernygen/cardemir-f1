@@ -3,7 +3,7 @@
 // This module fetches calendar + race results from the API
 // and computes the Cardemir custom championships (PG/PGNN/PGC/PGNS/Ters/QR) itself.
 
-import { getPowerRankings, calculatePowerPoints } from "../powerRankings.js";
+import { getPowerRankings, calculatePowerPoints } from "../powerRankings.js?v=9";
 
 const BASE = "https://api.jolpi.ca/ergast/f1";
 const PAGE = 100;

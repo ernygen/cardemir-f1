@@ -1,7 +1,7 @@
-import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js";
-import * as api from "./providers/f1ApiProvider.js";
-import { driverPhoto, teamCarPhoto, teamCarPhotoYear, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki, f1Headshot } from "./assets.js";
-import { getPowerRankings, saveRoundPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, parsePowerInput, formatPowerItems, exportPowerRankings } from "./powerRankings.js";
+import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js?v=9";
+import * as api from "./providers/f1ApiProvider.js?v=9";
+import { driverPhoto, teamCarPhoto, teamCarPhotoYear, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki, f1Headshot } from "./assets.js?v=9";
+import { getPowerRankings, saveRoundPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, parsePowerInput, formatPowerItems, exportPowerRankings } from "./powerRankings.js?v=9";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
