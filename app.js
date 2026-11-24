@@ -1,7 +1,7 @@
 import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js";
 import * as api from "./providers/f1ApiProvider.js";
 import { driverPhoto, teamCarPhoto, teamCarPhotoYear, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki, f1Headshot } from "./assets.js";
-import { getPowerRankings, saveRoundPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, parsePowerInput, formatPowerItems } from "./powerRankings.js";
+import { getPowerRankings, saveRoundPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, parsePowerInput, formatPowerItems, exportPowerRankings } from "./powerRankings.js";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
@@ -540,6 +540,7 @@ piastri 7,6">${esc(textVal)}</textarea>
       <div class="powerActions">
         <button id="prSaveBtn" class="powerBtnPrimary">💾 Kaydet ve Sıralamayı Güncelle</button>
         <button id="prClearBtn" class="powerBtnSec">🗑️ Bu Turu Temizle</button>
+        <button id="prExportBtn" class="powerBtnSec">📋 JSON Kopyala</button>
         <button id="prResetAllBtn" class="powerBtnDanger">Tümünü Sıfırla</button>
       </div>
     </div>
@@ -602,6 +603,18 @@ function initPowerEditor(d) {
       if (newMsg) {
         newMsg.className = "powerMsg ok";
         newMsg.textContent = `R${rd} temizlendi!`;
+      }
+    };
+  }
+
+  const exportBtn = $("prExportBtn");
+  if (exportBtn) {
+    exportBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(exportPowerRankings(S.season));
+        if (msg) { msg.className = "powerMsg ok"; msg.textContent = "✓ Panoya kopyalandı"; }
+      } catch {
+        if (msg) { msg.className = "powerMsg err"; msg.textContent = "Kopyalanamadı"; }
       }
     };
   }

@@ -97,3 +97,23 @@ test("finite upto ignores official", () => {
   assert.equal(t[0].id, "prost");
   assert.equal(t[0].value, 9);
 });
+
+// --- Task 3: power rankings storage ---
+import { getPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, exportPowerRankings } from "../powerRankings.js";
+
+function withFakeStorage(fn) {
+  const m = new Map();
+  globalThis.localStorage = { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
+  try { fn(); } finally { delete globalThis.localStorage; }
+}
+
+test("clear hides a default round", () => withFakeStorage(() => {
+  clearRoundPowerRankings("2026", 19);
+  assert.equal(getPowerRankings("2026")[19].length, 0);
+  resetAllPowerRankings("2026");
+  assert.equal(getPowerRankings("2026")[19].length, 10);
+}));
+
+test("export returns saved rankings as JSON", () => withFakeStorage(() => {
+  assert.deepEqual(JSON.parse(exportPowerRankings("2026")), JSON.parse(JSON.stringify(getPowerRankings("2026"))));
+}));
