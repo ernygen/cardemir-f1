@@ -147,10 +147,12 @@ export async function loadSeason(year) {
     round: Number(r.round), name: r.raceName, date: r.date,
     circuit: r.Circuit.circuitName, circuitId: r.Circuit.circuitId, wiki: r.Circuit.url || null,
   }));
-  const [resRows, sprintRows, qualiRows] = await Promise.all([
+  const [resRows, sprintRows, qualiRows, driverStd, teamStd] = await Promise.all([
     fetchAllRows(`/${year}/results.json`),
     fetchAllRows(`/${year}/sprint.json`).catch(() => []),
     fetchAllRows(`/${year}/qualifying.json`).catch(() => []),
+    fetchJson(`/${year}/driverStandings.json?limit=100`).catch(() => null),
+    fetchJson(`/${year}/constructorStandings.json?limit=100`).catch(() => null),
   ]);
   const group = (rows) => {
     const m = new Map();
@@ -229,7 +231,31 @@ export async function loadSeason(year) {
     drivers: [...drivers.values()], teams: [...teams.values()],
   };
   applyPowerRankings(res, year);
+  applyOfficialStandings(res, driverStd, teamStd);
   return res;
+}
+
+// Official final standings (pre-1991 dropped scores, DSQs). A null json = fetch failed → raw sums stay;
+// an empty list = no such championship (constructors before 1958).
+export function applyOfficialStandings(data, driverJson, teamJson) {
+  const read = (json, key, idOf) => json ? new Map(
+    (json.MRData?.StandingsTable?.StandingsLists?.[0]?.[key] || []).map((s) => [idOf(s), {
+      pos: s.position ? Number(s.position) : Infinity, points: pts(s.points), wins: Number(s.wins) || 0,
+    }])) : null;
+  data.official = {
+    drivers: read(driverJson, "DriverStandings", (s) => s.Driver.driverId),
+    teams: read(teamJson, "ConstructorStandings", (s) => s.Constructor.constructorId),
+  };
+}
+
+function officialOrder(arr, map) {
+  if (!map || !map.size) return arr;
+  for (const a of arr) {
+    const o = map.get(a.id);
+    if (o) { a.value = o.points; a.wins = o.wins; }
+  }
+  const pos = (a) => map.get(a.id)?.pos ?? Infinity;
+  return [...arr].sort((a, b) => (pos(a) === pos(b) ? 0 : pos(a) - pos(b)));
 }
 
 export function applyPowerRankings(data, year = "2026") {
@@ -368,6 +394,8 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
       arr.sort((a, b) => b.value - a.value || (b.avgScore ?? -1) - (a.avgScore ?? -1) || (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || b.wins - a.wins);
     }
   } else arr.sort((a, b) => b.value - a.value);
+  const final = metric === "real" && upto === Infinity;
+  if (final && who === "drivers") arr = officialOrder(arr, data.official?.drivers);
 
   if (who === "teams") {
     // Teams: credited to the round's team (a mid-season mover's old points
@@ -416,6 +444,7 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
       }
     } else {
       arr = [...t.values()].sort((a, b) => b.value - a.value || b.wins - a.wins);
+      if (final) arr = officialOrder(arr, data.official?.teams);
     }
   }
   return arr;
@@ -460,5 +489,6 @@ export function getChampions(data) {
     w.races.push({ round: r.round, name: r.name });
   }
   const winners = [...wm.values()].sort((a, b) => b.wins - a.wins);
-  return { driver: dw, team: cw, rounds: data.rounds.length, differentWinners: winners.length, winners };
+  const noTeamTitle = data.official?.teams && data.official.teams.size === 0;
+  return { driver: dw, team: noTeamTitle ? null : cw, rounds: data.rounds.length, differentWinners: winners.length, winners };
 }
