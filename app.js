@@ -1,14 +1,14 @@
-import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON, BINGO_EVENTS } from "./config.js?v=9";
-import * as api from "./providers/f1ApiProvider.js?v=9";
-import { driverPhoto, teamCarPhoto, teamCarPhotoYear, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki, f1Headshot } from "./assets.js?v=9";
-import { getPowerRankings, saveRoundPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, parsePowerInput, formatPowerItems, exportPowerRankings } from "./powerRankings.js?v=9";
+import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON } from "./config.js?v=10";
+import * as api from "./providers/f1ApiProvider.js?v=10";
+import { driverPhoto, teamCarPhoto, teamCarPhotoYear, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki, f1Headshot } from "./assets.js?v=10";
+import { getPowerRankings, saveRoundPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, parsePowerInput, formatPowerItems, exportPowerRankings } from "./powerRankings.js?v=10";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
   ["tracks", "Tracks"], ["drivers", "Drivers' Championship"], ["teams", "Constructors' Championship"],
   ["qr", "Grid / Race"], ["pg", "Position Gain"], ["ters", "Reverse Championship"],
   ["power", "Power Rankings"],
-  ["history", "History"], ["bingo", "Bingo"],
+  ["history", "History"],
 ];
 const PG_MODES = [
   ["pg", "Position Gain (with negatives)"],
@@ -37,7 +37,7 @@ async function loadSeason(season) {
 }
 
 async function boot() {
-  // sezon listesi
+  // season list
   const years = [];
   for (let y = Number(MAX_SEASON); y >= Number(MIN_SEASON); y--) years.push(String(y));
   $("season").innerHTML = years.map((y) => `<option ${y === S.season ? "selected" : ""}>${y}</option>`).join("");
@@ -59,9 +59,9 @@ async function boot() {
   $("pgMode").innerHTML = PG_MODES.map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
   $("pgMode").onchange = () => { S.pgmode = $("pgMode").value; render(); };
   const POWER_SORTS = [
-    ["pts", "Sırala: Toplam Puan (25-1)"],
-    ["avg", "Sırala: Ortalama Not"],
-    ["score", "Sırala: Toplam Not"],
+    ["pts", "Sort: Total points (25-1)"],
+    ["avg", "Sort: Average score"],
+    ["score", "Sort: Total score"],
   ];
   const pSort = $("powerSort");
   if (pSort) {
@@ -81,7 +81,7 @@ async function refresh() {
     render();
   } catch (e) {
     $("statLine").textContent = "Error: " + e.message;
-    $("content").innerHTML = `<div class="card"><div class="cb">Couldn't load</div><div class="cm">Check your connection/API, then retry.</div><div class="bingoBar"><button id="retry">Retry</button></div></div>`;
+    $("content").innerHTML = `<div class="card"><div class="cb">Couldn't load</div><div class="cm">Check your connection/API, then retry.</div><div class="actions"><button id="retry">Retry</button></div></div>`;
     const b = $("retry");
     if (b) b.onclick = () => { cache.delete(S.season); refresh(); };
   } finally { S.loading = false; }
@@ -171,6 +171,55 @@ function splitView(last, leftTable, rightTable) {
   return `<div class="split"><div class="card lastrace"><div class="ct">Last race — R${last.key} ${esc(last.name)}</div>${leftTable}</div><div class="fullwrap">${rightTable}</div></div>`;
 }
 
+// --- Championship battles (drivers, season still running) ---
+const REACH_HINT = "Hover or tap a position number to see who can still finish there.";
+const signed = (v) => (v > 0 ? "+" : v < 0 ? "−" : "±") + fmtPts(Math.abs(v));
+
+// Cards for P1–P3: who can still finish there, and by how much they trail/lead the current holder
+function battlesHtml(all, reach, ptsLeft) {
+  const cards = [1, 2, 3].filter((n) => all[n - 1]).map((n) => {
+    const holder = all[n - 1];
+    const contenders = all.filter((x) => reach.get(x.id).best <= n && reach.get(x.id).worst >= n);
+    const label = n === 1 ? "Title" : `Battle for P${n}`;
+    if (contenders.length <= 1) {
+      return `<div class="battle decided"><div class="bhead"><span>${label}</span><span class="tag champ">Decided</span></div>
+        <div class="bname">${esc(holder.name)}${n === 1 ? " is champion" : ` locked in P${n}`}</div>
+        <div class="bmeta">Only ${ptsLeft} pts left to win.</div></div>`;
+    }
+    const rivals = contenders.filter((x) => x !== holder).map((x) => `${esc(x.name.split(" ").pop())} <span class="num">${signed(x.value - holder.value)}</span>`);
+    return `<div class="battle"><div class="bhead"><span>${label}</span><span class="tag fight">Open · ${contenders.length} drivers</span></div>
+      <div class="bname">${esc(holder.name)} holds it</div>
+      <div class="bmeta">${rivals.join(", ")} · ${ptsLeft} pts left</div></div>`;
+  });
+  return `<section class="battles" aria-label="Championship battles">${cards.join("")}</section>`;
+}
+
+// Hover/focus/tap a rank: highlight drivers whose reachable range includes it
+function initReach() {
+  const note = $("reachNote");
+  const tbl = note && note.parentElement.querySelector("table");
+  if (!tbl) return;
+  let pinned = null;
+  const show = (n) => {
+    const hits = [];
+    tbl.classList.toggle("reachmode", n !== null);
+    for (const tr of tbl.querySelectorAll("tr[data-reach]")) {
+      const [b, w] = tr.dataset.reach.split("-").map(Number);
+      const hit = n !== null && n >= b && n <= w;
+      tr.classList.toggle("reach", hit);
+      if (hit) hits.push(tr.dataset.code);
+    }
+    for (const btn of tbl.querySelectorAll(".rankbtn")) btn.classList.toggle("on", Number(btn.dataset.rank) === n);
+    note.innerHTML = n === null ? REACH_HINT : `<b>Can still finish P${n}:</b> ${hits.map(esc).join(", ") || "—"}`;
+  };
+  for (const btn of tbl.querySelectorAll(".rankbtn")) {
+    const n = Number(btn.dataset.rank);
+    btn.onmouseenter = btn.onfocus = () => show(n);
+    btn.onmouseleave = btn.onblur = () => show(pinned);
+    btn.onclick = () => { pinned = pinned === n ? null : n; show(pinned); };
+  }
+}
+
 // Last event team points (left panel)
 function lastRoundTeams(last) {
   const tm = new Map();
@@ -205,7 +254,7 @@ function render() {
         ? `<div class="twin">⚡ ${winLogo(sp.winner) || `<b>${esc(sp.winner.code)}</b>`} <span>${esc(sp.winner.name)}</span></div>`
         : "";
       return `<div class="tcard" data-round="${s.round}">
-        <div class="timg">${img}<span class="tround">R${s.round}</span>${sp ? `<span class="tsprint">SPRINT</span>` : ""}</div>
+        <div class="timg">${img}<span class="tround">R${s.round}</span>${sp ? `<span class="tsprint">SPR</span>` : ""}</div>
         <div class="tbody"><div class="tname">${esc(s.name)}</div>
         <div class="tmeta">${esc(s.circuit)}</div>${win}${swin}</div>
       </div>`;
@@ -216,8 +265,19 @@ function render() {
     const isD = S.tab === "drivers";
     const opts = { who: isD ? "drivers" : "teams", metric: "real" };
     if (d.events.length >= 2) {
-      const rows = api.tableWithChanges(d, opts).filter((x) => matchQ(x.name, x.code || ""));
+      const all = api.tableWithChanges(d, opts);
+      const rows = all.filter((x) => matchQ(x.name, x.code || ""));
       const last = d.events[d.events.length - 1];
+      // Drivers: who can still finish where (only while the season is running)
+      const ptsLeft = isD ? api.pointsLeft(d) : 0;
+      const reach = api.finishRange(all, ptsLeft);
+      const gap = new Map(all.map((x, i) => [x.id, !i ? "—" : all[i - 1].value === x.value ? "0" : "−" + fmtPts(all[i - 1].value - x.value)]));
+      const p2 = all.filter((x) => reach.get(x.id).best <= 2 && reach.get(x.id).worst >= 2);
+      const tagFor = (x) => reach.get(x.id).worst === 1 ? `<span class="tag champ">Champion</span>`
+        : ptsLeft > 0 && p2.length > 1 && p2.includes(x) ? `<span class="tag fight">P2 fight</span>` : "";
+      const rankCell = (x) => ptsLeft > 0
+        ? `<td class="pos"><button type="button" class="rankbtn" data-rank="${x.rank}" aria-label="Who can still finish P${x.rank}">${x.rank}</button></td>`
+        : `<td class="pos">${x.rank}</td>`;
       let left;
       if (isD) {
         const top = [...last.drivers].filter((x) => x.classified).sort((a, b) => a.finish - b.finish).slice(0, 10);
@@ -227,18 +287,20 @@ function render() {
         left = table(["Team", "Pts"], lastRoundTeams(last).map((t, i) =>
           `<tr><td class="${medalClass(i + 1)}"><span class="who">${teamImgFor(d, t.id, t.name, "logo", "logo")}${esc(t.name)}</span></td><td class="pts">${fmtPts(t.v)}</td></tr>`));
       }
-      const right = table(isD ? ["#", "Δ", "Driver", "Team", "W"].concat(rows.some((x) => x.swins) ? ["SW"] : []).concat(["Pts"]) : ["#", "Δ", "Team", "W", "Pts"],
+      const right = (ptsLeft > 0 ? `<div id="reachNote" class="reachnote" aria-live="polite">${REACH_HINT}</div>` : "") +
+        table(isD ? ["#", "Δ", "Driver", "Team", "W"].concat(rows.some((x) => x.swins) ? ["SW"] : []).concat(["Gap", "Pts"]) : ["#", "Δ", "Team", "W", "Pts"],
         rows.map((x) => {
           const bar = `<span class="tbar" style="background:${teamColor(isD ? x.teamId : x.id)}"></span>`;
           if (isD) {
             const ph = photoFor(x, "dphoto");
-            return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td>${x.swins ? `<td>${x.swins}</td>` : (rows.some((y) => y.swins) ? "<td></td>" : "")}<td class="pts">${fmtPts(x.value)}</td></tr>`;
+            const r = reach.get(x.id);
+            return `<tr data-reach="${r.best}-${r.worst}" data-code="${esc(x.code)}">${rankCell(x)}<td>${deltaCell(x)}</td><td><span class="who">${ph}<span>${bar}<b>${esc(x.code)}</b> ${esc(x.name)} ${tagFor(x)}</span></span></td><td>${esc(x.team)}</td><td>${x.wins}</td>${x.swins ? `<td>${x.swins}</td>` : (rows.some((y) => y.swins) ? "<td></td>" : "")}<td class="mut num">${gap.get(x.id)}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
           }
           const logo = teamImgFor(d, x.id, x.name, "logo", "logo");
           const car = hasTeam(x.id) ? imgTag(teamCarPhoto(x.id), x.name, "carphoto") : "";
           return `<tr><td class="pos">${x.rank}</td><td>${deltaCell(x)}</td><td><span class="who">${logo}${car}<span>${bar}${esc(x.name)}</span></span></td><td>${x.wins}</td><td class="pts">${fmtPts(x.value)}</td></tr>`;
         }));
-      html = splitView(last, left, right);
+      html = (ptsLeft > 0 ? battlesHtml(all, reach, ptsLeft) : "") + splitView(last, left, right);
       stat = `${rows.length} ${isD ? "drivers" : "teams"} • arrows vs previous event`;
     } else {
       const rows = api.computeTable(d, opts).filter((x) => matchQ(x.name, x.code || ""));
@@ -390,7 +452,7 @@ function render() {
           }));
         stat = `${R.name} • Power Rankings (${list.length} drivers)`;
       } else {
-        html = editor + `<div class="card"><div class="cb">No Power Rankings for ${esc(R.name)}</div><div class="cm">Yukarıdaki menüden pilotları ve notları girip kaydedebilirsiniz.</div></div>`;
+        html = editor + `<div class="card"><div class="cb">No Power Rankings for ${esc(R.name)}</div><div class="cm">Enter drivers and scores in the editor above, then save.</div></div>`;
         stat = `${R.name} • No Power Rankings data yet`;
       }
     } else {
@@ -400,10 +462,10 @@ function render() {
 
       const sortBar = `
         <div class="powerSortBar">
-          <span class="powerSortLabel">Sıralama:</span>
-          <button class="powerSortBtn ${sort === "pts" ? "active" : ""}" data-sort="pts">🏆 Toplam Puan (25-1)</button>
-          <button class="powerSortBtn ${sort === "avg" ? "active" : ""}" data-sort="avg">⭐ Ortalama Not</button>
-          <button class="powerSortBtn ${sort === "score" ? "active" : ""}" data-sort="score">📊 Toplam Not</button>
+          <span class="powerSortLabel">Sort by:</span>
+          <button class="powerSortBtn ${sort === "pts" ? "active" : ""}" data-sort="pts">Total points (25-1)</button>
+          <button class="powerSortBtn ${sort === "avg" ? "active" : ""}" data-sort="avg">Average score</button>
+          <button class="powerSortBtn ${sort === "score" ? "active" : ""}" data-sort="score">Total score</button>
         </div>
       `;
 
@@ -417,10 +479,10 @@ function render() {
         "Δ",
         "Driver",
         "Team",
-        thSort("avg", "Ortalama"),
-        thSort("score", "Toplam Not"),
+        thSort("avg", "Avg"),
+        thSort("score", "Score sum"),
         "Wins",
-        thSort("pts", "Toplam Puan"),
+        thSort("pts", "Pts"),
       ], rows.map((x) => {
         const bar = `<span class="tbar" style="background:${teamColor(x.teamId)}"></span>`;
         const ph = photoFor(x, "dphoto");
@@ -442,7 +504,7 @@ function render() {
         html = editor + splitView(lastWithPower, left, right);
         stat = `${lastWithPower.name} Power Rankings (left) • ${S.season} Championship (right)`;
       } else {
-        html = editor + (hasAny ? right : `<div class="card"><div class="cb">No Power Rankings entered yet for ${esc(S.season)}</div><div class="cm">Yukarıdaki menüden pilotları ve notları girip kaydedebilirsiniz.</div></div>`);
+        html = editor + (hasAny ? right : `<div class="card"><div class="cb">No Power Rankings entered yet for ${esc(S.season)}</div><div class="cm">Enter drivers and scores in the editor above, then save.</div></div>`);
         stat = `${S.season} Aramco Power Rankings Championship`;
       }
     }
@@ -461,13 +523,10 @@ function render() {
       c.winners.filter((w) => matchQ(w.name, w.code, w.team)).map((w) =>
         `<tr><td><b>${esc(w.code)}</b> ${esc(w.name)}</td><td>${esc(w.team)}</td><td class="pts">${w.wins}</td><td>${w.races.map((r) => `<span class="racechip">R${r.round} ${esc(r.name.replace(" Grand Prix", ""))}</span>`).join("")}</td></tr>`));
     stat = `${S.season} season overview`;
-  } else if (S.tab === "bingo") {
-    html = `<div id="bingoGrid" class="bingo"></div><div class="bingoBar"><span id="bingoCount"></span><button id="bingoAdd">+ Add event</button><button id="bingoReset">Reset</button></div>`;
-    stat = "WC events — click to mark";
   }
   $("content").innerHTML = html;
   $("statLine").textContent = stat;
-  if (S.tab === "bingo") initBingo();
+  if (S.tab === "drivers") initReach();
   if (S.tab === "power") {
     initPowerEditor(d);
     document.querySelectorAll(".powerSortBtn, [data-sort]").forEach((el) => {
@@ -513,22 +572,22 @@ function powerEditorHtml(d, R) {
   return `
   <div class="powerEditor">
     <div class="powerHeader">
-      <div class="powerTitle">⚡ Aramco Power Rankings Girişi</div>
+      <div class="powerTitle">Aramco Power Rankings editor</div>
       <div>
-        <button id="prToggleEditor" class="powerBtnSec">${PR_EDITOR_OPEN ? "▲ Menüyü Gizle" : "▼ Not Gir / Düzenle"}</button>
+        <button id="prToggleEditor" class="powerBtnSec">${PR_EDITOR_OPEN ? "Hide editor" : "Enter / edit scores"}</button>
       </div>
     </div>
     <div id="prEditorBody" style="${PR_EDITOR_OPEN ? "" : "display:none;"}">
       <div class="powerRow">
-        <label>Yarış / Tur Seç:
+        <label>Round:
           <select id="prRoundSelect">${roundOpts}</select>
         </label>
         <span id="prStatusMsg" class="powerMsg"></span>
       </div>
       <div class="powerHint">
-        Her satıra bir pilot ve notunu yazın (örn: <code>norris 9,8</code> veya <code>NOR 9.8</code>). Girilen tüm pilotlar nota göre sıralanır ve 25'ten 1'e kadar puanlar eşit basamaklarla dağıtılır.
+        One driver and score per line (e.g. <code>norris 9,8</code> or <code>NOR 9.8</code>). Drivers are ranked by score and get points from 25 down to 1 in equal steps.
       </div>
-      <textarea id="prInput" class="powerTextarea" placeholder="Örnek:
+      <textarea id="prInput" class="powerTextarea" placeholder="Example:
 norris 9,8
 verstappen 9,6
 lawson 9,2
@@ -540,10 +599,10 @@ bearman 8,0
 alonso 7,8
 piastri 7,6">${esc(textVal)}</textarea>
       <div class="powerActions">
-        <button id="prSaveBtn" class="powerBtnPrimary">💾 Kaydet ve Sıralamayı Güncelle</button>
-        <button id="prClearBtn" class="powerBtnSec">🗑️ Bu Turu Temizle</button>
-        <button id="prExportBtn" class="powerBtnSec">📋 JSON Kopyala</button>
-        <button id="prResetAllBtn" class="powerBtnDanger">Tümünü Sıfırla</button>
+        <button id="prSaveBtn" class="powerBtnPrimary">Save &amp; update rankings</button>
+        <button id="prClearBtn" class="powerBtnSec">Clear this round</button>
+        <button id="prExportBtn" class="powerBtnSec">Copy JSON</button>
+        <button id="prResetAllBtn" class="powerBtnDanger">Reset all</button>
       </div>
     </div>
   </div>`;
@@ -563,7 +622,7 @@ function initPowerEditor(d) {
     toggleBtn.onclick = () => {
       PR_EDITOR_OPEN = !PR_EDITOR_OPEN;
       body.style.display = PR_EDITOR_OPEN ? "" : "none";
-      toggleBtn.textContent = PR_EDITOR_OPEN ? "▲ Menüyü Gizle" : "▼ Not Gir / Düzenle";
+      toggleBtn.textContent = PR_EDITOR_OPEN ? "Hide editor" : "Enter / edit scores";
     };
   }
 
@@ -581,7 +640,7 @@ function initPowerEditor(d) {
       const rd = Number(roundSel.value);
       const items = parsePowerInput(input.value, d.drivers || []);
       if (!items.length) {
-        if (msg) { msg.className = "powerMsg err"; msg.textContent = "Geçerli bir satır girilmedi!"; }
+        if (msg) { msg.className = "powerMsg err"; msg.textContent = "No valid lines entered."; }
         return;
       }
       saveRoundPowerRankings(S.season, rd, items);
@@ -590,7 +649,7 @@ function initPowerEditor(d) {
       const newMsg = $("prStatusMsg");
       if (newMsg) {
         newMsg.className = "powerMsg ok";
-        newMsg.textContent = `✓ R${rd} için ${items.length} pilot kaydedildi! Sıralama güncellendi.`;
+        newMsg.textContent = `Saved ${items.length} drivers for R${rd}. Rankings updated.`;
       }
     };
   }
@@ -604,7 +663,7 @@ function initPowerEditor(d) {
       const newMsg = $("prStatusMsg");
       if (newMsg) {
         newMsg.className = "powerMsg ok";
-        newMsg.textContent = `R${rd} temizlendi!`;
+        newMsg.textContent = `R${rd} cleared.`;
       }
     };
   }
@@ -614,59 +673,22 @@ function initPowerEditor(d) {
     exportBtn.onclick = async () => {
       try {
         await navigator.clipboard.writeText(exportPowerRankings(S.season));
-        if (msg) { msg.className = "powerMsg ok"; msg.textContent = "✓ Panoya kopyalandı"; }
+        if (msg) { msg.className = "powerMsg ok"; msg.textContent = "Copied to clipboard"; }
       } catch {
-        if (msg) { msg.className = "powerMsg err"; msg.textContent = "Kopyalanamadı"; }
+        if (msg) { msg.className = "powerMsg err"; msg.textContent = "Could not copy"; }
       }
     };
   }
 
   if (resetBtn) {
     resetBtn.onclick = () => {
-      if (confirm(`${S.season} sezonuna ait tüm manuel Power Rankings kayıtları sıfırlansın mı?`)) {
+      if (confirm(`Reset all saved Power Rankings for ${S.season}?`)) {
         resetAllPowerRankings(S.season);
         api.applyPowerRankings(d, S.season);
         render();
       }
     };
   }
-}
-
-// --- Bingo ---
-const BKEY = "cardemir-bingo-v1";
-function bingoState() {
-  try { return JSON.parse(localStorage.getItem(BKEY)) || {}; } catch { return {}; }
-}
-function initBingo() {
-  const st = bingoState();
-  const custom = st._custom || [];
-  const events = [...BINGO_EVENTS, ...custom];
-  const grid = $("bingoGrid");
-  const paint = () => {
-    grid.innerHTML = events.map((e, i) =>
-      `<div class="tile ${st[i] ? "on" : ""}" data-i="${i}">${esc(e)}</div>`).join("");
-    const n = events.filter((_, i) => st[i]).length;
-    $("bingoCount").textContent = `${n}/${events.length} done`;
-  };
-  grid.onclick = (e) => {
-    const t = e.target.closest(".tile");
-    if (!t) return;
-    const i = t.dataset.i;
-    const s = bingoState();
-    s[i] = !s[i];
-    try { localStorage.setItem(BKEY, JSON.stringify(s)); } catch {}
-    initBingo();
-  };
-  $("bingoAdd").onclick = () => {
-    const v = prompt("New event:");
-    if (!v || !v.trim()) return;
-    const s = bingoState();
-    s._custom = [...(s._custom || []), v.trim()];
-    try { localStorage.setItem(BKEY, JSON.stringify(s)); } catch {}
-    initBingo();
-  };
-  $("bingoReset").onclick = () => { try { localStorage.removeItem(BKEY); } catch {} initBingo(); };
-  paint();
 }
 
 boot();

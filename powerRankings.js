@@ -17,7 +17,7 @@ export function calculatePowerPoints(count) {
 const pr = (s) => s.split(",").map((p) => { const [code, score] = p.split(" "); return { code, score: Number(score) }; });
 
 // Built-in rankings every visitor sees (browser-saved entries override per round).
-// To update: Power tab → "📋 JSON Kopyala", then paste the rounds here.
+// To update: Power tab → "Copy JSON", then paste the rounds here.
 export const DEFAULT_POWER_RANKINGS = {
   2026: {
     1: pr("RUS 9.8,LIN 9.2,ANT 8.8,LEC 8.6,BEA 8.2,HAM 8,GAS 8,BOR 8,VER 7.8,HAD 7.8"),

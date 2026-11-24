@@ -3,7 +3,7 @@
 // This module fetches calendar + race results from the API
 // and computes the Cardemir custom championships (PG/PGNN/PGC/PGNS/Ters/QR) itself.
 
-import { getPowerRankings, calculatePowerPoints } from "../powerRankings.js?v=9";
+import { getPowerRankings, calculatePowerPoints } from "../powerRankings.js?v=10";
 
 const BASE = "https://api.jolpi.ca/ergast/f1";
 const PAGE = 100;
@@ -146,6 +146,7 @@ export async function loadSeason(year) {
   const schedule = (schedJson.MRData.RaceTable.Races || []).map((r) => ({
     round: Number(r.round), name: r.raceName, date: r.date,
     circuit: r.Circuit.circuitName, circuitId: r.Circuit.circuitId, wiki: r.Circuit.url || null,
+    sprint: Boolean(r.Sprint),
   }));
   const [resRows, sprintRows, qualiRows, driverStd, teamStd] = await Promise.all([
     fetchAllRows(`/${year}/results.json`),
@@ -290,6 +291,29 @@ export function applyPowerRankings(data, year = "2026") {
   }
 }
 
+
+// Most points one driver can still add this season (0 once the last round has run).
+// shortcut: modern scale (25 per GP, 8 per sprint, +1 fastest lap 2019-2024); only in-progress seasons use it.
+export function pointsLeft(data) {
+  const last = Math.max(0, ...data.rounds.map((r) => r.round));
+  const fl = Number(data.season) >= 2019 && Number(data.season) <= 2024 ? 1 : 0;
+  return data.schedule.filter((s) => s.round > last).reduce((sum, s) => sum + 25 + fl + (s.sprint ? 8 : 0), 0);
+}
+
+// Best/worst finishing position each driver can still reach. table: sorted [{id, value}].
+// shortcut: treats every driver as able to score maxLeft alone (two can't both win one race), so ranges run wide.
+export function finishRange(table, maxLeft) {
+  const out = new Map();
+  table.forEach((x, i) => {
+    if (maxLeft <= 0) return out.set(x.id, { best: i + 1, worst: i + 1 });
+    const others = table.filter((y) => y !== x);
+    out.set(x.id, {
+      best: 1 + others.filter((y) => y.value > x.value + maxLeft).length,
+      worst: 1 + others.filter((y) => y.value + maxLeft >= x.value).length,
+    });
+  });
+  return out;
+}
 
 // Power table order: chosen key first, then the other two, then wins
 function powerCmp(sort) {

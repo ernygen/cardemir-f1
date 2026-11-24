@@ -204,3 +204,30 @@ test("save/clear store only the edited round, not the defaults", () => withFakeS
   clearRoundPowerRankings("2026", 7);
   assert.deepEqual(stored(), ["5", "7"]);
 }));
+
+// --- Redesign: points left + reachable finishing range ---
+import { pointsLeft, finishRange } from "../providers/f1ApiProvider.js";
+
+test("pointsLeft: remaining GPs and sprints after the last run round", () => {
+  const d = { season: "2026", rounds: [{ round: 1 }, { round: 2 }], schedule: [{ round: 1 }, { round: 2 }, { round: 3, sprint: true }, { round: 4 }] };
+  assert.equal(pointsLeft(d), 25 + 8 + 25);
+});
+test("pointsLeft: fastest-lap point in 2019-2024", () => {
+  const d = { season: "2024", rounds: [{ round: 1 }], schedule: [{ round: 1 }, { round: 2 }] };
+  assert.equal(pointsLeft(d), 26);
+});
+test("pointsLeft: finished season is 0", () => {
+  assert.equal(pointsLeft({ season: "1988", rounds: [{ round: 1 }], schedule: [{ round: 1 }] }), 0);
+});
+test("finishRange: who can still reach which position", () => {
+  const t = [{ id: "ant", value: 402 }, { id: "ver", value: 304 }, { id: "ham", value: 267 }, { id: "lec", value: 250 }];
+  const r = finishRange(t, 50);
+  assert.deepEqual(r.get("ant"), { best: 1, worst: 1 });
+  assert.deepEqual(r.get("ver"), { best: 2, worst: 3 });
+  assert.deepEqual(r.get("lec"), { best: 3, worst: 4 });
+});
+test("finishRange: no points left keeps the real order, ties included", () => {
+  const r = finishRange([{ id: "a", value: 10 }, { id: "b", value: 10 }], 0);
+  assert.deepEqual(r.get("a"), { best: 1, worst: 1 });
+  assert.deepEqual(r.get("b"), { best: 2, worst: 2 });
+});

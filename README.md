@@ -7,7 +7,7 @@ The Excel file (`F126.xlsx`) is concept only — no data is taken from it.
 ## Tabs
 
 - **Tracks** — F1-style 3-column track cards (click a card for round detail)
-- **Drivers' / Constructors' Championship** — real points, last race on the left, full table with position arrows (▲▼) on the right
+- **Drivers' / Constructors' Championship** — real points, last race on the left, full table with position arrows (▲▼) on the right; while a season runs, the drivers' tab shows the title/P2/P3 battles and hovering a position number highlights who can still finish there
 - **Grid / Race** — starting grid → race result matrix with AVG Q / AVG R columns
 - **Position Gain (PG)** — grid − finish; **PGNN** counts negatives as 0
 - **Position Gaining Championship (PGC)** — top 10 gainers per event score 25-18-15…; ties split slot points
@@ -15,7 +15,6 @@ The Excel file (`F126.xlsx`) is concept only — no data is taken from it.
 - **Reverse Championship** — classified finishers scored back-to-front (last gets 25), no DNFs
 - **Power Rankings** — 25-1 points awarded based on Aramco Power Rankings order per Grand Prix
 - **History** — champions of any season 1950–2026 + who-won-where table
-- **Bingo** — WC event cards (click to mark, stored in browser)
 
 One **Position Gain** tab hosts PG / PGNN / PGC / PGNS via the championship selector up top.
 
