@@ -194,3 +194,13 @@ test("power sort modes: pts / avg / score, drivers and teams", () => {
     assert.deepEqual(order(who, "score"), ["b", "c", "a"]);
   }
 });
+
+// --- Final review fix: storage keeps only user-edited rounds ---
+import { saveRoundPowerRankings } from "../powerRankings.js";
+test("save/clear store only the edited round, not the defaults", () => withFakeStorage(() => {
+  const stored = () => Object.keys(JSON.parse(localStorage.getItem("cardemir_power_rankings_2026")));
+  saveRoundPowerRankings("2026", 5, [{ code: "NOR", score: 9 }]);
+  assert.deepEqual(stored(), ["5"]);
+  clearRoundPowerRankings("2026", 7);
+  assert.deepEqual(stored(), ["5", "7"]);
+}));

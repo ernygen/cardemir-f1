@@ -58,29 +58,21 @@ export function getPowerRankings(year = "2026") {
   }
 }
 
+// Stores only the browser's own edits, so later updates to the built-in defaults still reach this visitor
 export function saveRoundPowerRankings(year, round, items) {
   if (typeof localStorage === "undefined") return false;
   try {
-    const current = getPowerRankings(year);
-    current[round] = items;
-    localStorage.setItem(storageKey(year), JSON.stringify(current));
+    const saved = JSON.parse(localStorage.getItem(storageKey(year)) || "{}");
+    saved[round] = items;
+    localStorage.setItem(storageKey(year), JSON.stringify(saved));
     return true;
   } catch {
     return false;
   }
 }
 
-export function clearRoundPowerRankings(year, round) {
-  if (typeof localStorage === "undefined") return false;
-  try {
-    const current = getPowerRankings(year);
-    current[round] = []; // empty list (not delete) so a built-in default round stays cleared
-    localStorage.setItem(storageKey(year), JSON.stringify(current));
-    return true;
-  } catch {
-    return false;
-  }
-}
+// Empty list (not delete) so a built-in default round stays cleared
+export const clearRoundPowerRankings = (year, round) => saveRoundPowerRankings(year, round, []);
 
 export function resetAllPowerRankings(year) {
   if (typeof localStorage === "undefined") return false;
