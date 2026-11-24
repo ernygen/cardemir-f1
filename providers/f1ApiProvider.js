@@ -258,6 +258,9 @@ function officialOrder(arr, map) {
   return [...arr].sort((a, b) => (pos(a) === pos(b) ? 0 : pos(a) - pos(b)));
 }
 
+const sameDriver = (d, key) =>
+  d.code?.toUpperCase() === String(key).toUpperCase() || d.id?.toLowerCase() === String(key).toLowerCase();
+
 export function applyPowerRankings(data, year = "2026") {
   if (!data || !data.events) return;
   const allRankings = getPowerRankings(year);
@@ -271,17 +274,8 @@ export function applyPowerRankings(data, year = "2026") {
       const resolved = prList.map((item, idx) => {
         const codeOrId = typeof item === "string" ? item : (item.code || item.id || "");
         const score = typeof item === "object" && item.score !== undefined ? item.score : null;
-        const found = ev.drivers.find((d) =>
-          d.code === codeOrId ||
-          d.id === codeOrId ||
-          d.code?.toUpperCase() === String(codeOrId).toUpperCase() ||
-          d.id?.toLowerCase() === String(codeOrId).toLowerCase()
-        ) || (data.drivers && data.drivers.find((d) =>
-          d.code === codeOrId ||
-          d.id === codeOrId ||
-          d.code?.toUpperCase() === String(codeOrId).toUpperCase() ||
-          d.id?.toLowerCase() === String(codeOrId).toLowerCase()
-        ));
+        const found = ev.drivers.find((d) => sameDriver(d, codeOrId)) ||
+          (data.drivers && data.drivers.find((d) => sameDriver(d, codeOrId)));
         return {
           id: found ? found.id : String(codeOrId).toLowerCase(),
           code: found ? found.code : String(codeOrId).toUpperCase(),

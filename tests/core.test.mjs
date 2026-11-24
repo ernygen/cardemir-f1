@@ -144,3 +144,39 @@ test("power arrows with one ranked event", () => {
   const t = tableWithChanges(d, { who: "drivers", metric: "power" });
   assert.ok(t.every((x) => x.diff === null));
 });
+
+// --- Task 5: power input parsing + driver lookup ---
+import { parsePowerInput, calculatePowerPoints } from "../powerRankings.js";
+import { applyPowerRankings } from "../providers/f1ApiProvider.js";
+
+const roster = [{ id: "norris", code: "NOR", name: "Lando Norris" }, { id: "hulkenberg", code: "HUL", name: "Nico Hülkenberg" }];
+
+test("parse: 'norris 9,8'", () => {
+  const [x] = parsePowerInput("norris 9,8", roster);
+  assert.equal(x.id, "norris"); assert.equal(x.score, 9.8);
+});
+test("parse: rank prefix and full name", () => {
+  const [x] = parsePowerInput("1. Lando Norris 9.8", roster);
+  assert.equal(x.id, "norris"); assert.equal(x.score, 9.8);
+});
+test("parse: code", () => assert.equal(parsePowerInput("HUL 8", roster)[0].id, "hulkenberg"));
+test("parse: duplicate keeps first", () => {
+  const r = parsePowerInput("norris 9\nNOR 5", roster);
+  assert.equal(r.length, 1); assert.equal(r[0].score, 9);
+});
+test("parse: sorted by score desc", () => {
+  assert.deepEqual(parsePowerInput("HUL 7\nnorris 9", roster).map((x) => x.id), ["norris", "hulkenberg"]);
+});
+test("calculatePowerPoints spreads 25..1", () => {
+  assert.deepEqual(calculatePowerPoints(3), [25, 13, 1]);
+  assert.deepEqual(calculatePowerPoints(1), [25]);
+});
+test("applyPowerRankings resolves codes to race drivers", () => {
+  const d = mkData([[row("norris", 1, 1), row("verstappen", 2, 2)]]);
+  d.events[0].round = 20;
+  d.drivers = [];
+  applyPowerRankings(d, "2026");
+  const ids = d.events[0].powerList.map((x) => x.id);
+  assert.ok(ids.includes("norris"));
+  assert.equal(d.events[0].powerWinner, "norris");
+});
