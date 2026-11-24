@@ -1,0 +1,29 @@
+# Adds each new Grand Prix's Power Rankings order (from formula1.com) to powerData.js.
+# Scores are not in the article text, so they are added by hand afterwards.
+name: Power Rankings
+
+on:
+  schedule:
+    - cron: "0 9 * * 2,3"   # Tue + Wed 09:00 UTC; F1 usually posts the article 1-2 days after a GP
+  workflow_dispatch: {}       # "Run workflow" button in the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/
+      - run: node scripts/power-rankings.mjs
+      - name: Commit new rounds
+        run: |
+          if git diff --quiet -- powerData.js; then echo "Nothing new."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "data: Power Rankings order from formula1.com (add scores by hand)" -- powerData.js
+          git push

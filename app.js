@@ -1,7 +1,7 @@
 import { DEFAULT_SEASON, MIN_SEASON, MAX_SEASON } from "./config.js?v=10";
 import * as api from "./providers/f1ApiProvider.js?v=10";
 import { driverPhoto, teamCarPhoto, teamCarPhotoYear, teamLogo, trackCardPhoto, teamColor, hasTeam, imgTag, wikiImg, wikiLogoImg, wikiGpImg, hydrateWiki, f1Headshot } from "./assets.js?v=10";
-import { getPowerRankings, saveRoundPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, parsePowerInput, formatPowerItems, exportPowerRankings } from "./powerRankings.js?v=10";
+import { getPowerRankings, saveRoundPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, parsePowerInput, formatPowerItems, exportPowerLine } from "./powerRankings.js?v=10";
 
 const $ = (id) => document.getElementById(id);
 const TABS = [
@@ -594,7 +594,7 @@ function powerEditorHtml(d, R) {
         <span id="prStatusMsg" class="powerMsg"></span>
       </div>
       <div class="powerHint">
-        One driver and score per line (e.g. <code>norris 9,8</code> or <code>NOR 9.8</code>). Drivers are ranked by score and get points from 25 down to 1 in equal steps.
+        One driver and score per line (e.g. <code>norris 9,8</code> or <code>NOR 9.8</code>). Drivers are ranked by score and get points from 25 down to 1 in equal steps. Saving here only changes this browser — to publish for everyone, copy the round's line and paste it into powerData.js on GitHub. New rounds arrive there automatically (order only) after F1 posts its Power Rankings.
       </div>
       <textarea id="prInput" class="powerTextarea" placeholder="Example:
 norris 9,8
@@ -610,7 +610,8 @@ piastri 7,6">${esc(textVal)}</textarea>
       <div class="powerActions">
         <button id="prSaveBtn" class="powerBtnPrimary">Save &amp; update rankings</button>
         <button id="prClearBtn" class="powerBtnSec">Clear this round</button>
-        <button id="prExportBtn" class="powerBtnSec">Copy JSON</button>
+        <button id="prExportBtn" class="powerBtnSec">Copy line for powerData.js</button>
+        <a class="powerLink" href="https://github.com/ernygen/cardemir-f1/edit/main/powerData.js" target="_blank" rel="noopener">Edit powerData.js on GitHub</a>
         <button id="prResetAllBtn" class="powerBtnDanger">Reset all</button>
       </div>
     </div>
@@ -681,8 +682,8 @@ function initPowerEditor(d) {
   if (exportBtn) {
     exportBtn.onclick = async () => {
       try {
-        await navigator.clipboard.writeText(exportPowerRankings(S.season));
-        if (msg) { msg.className = "powerMsg ok"; msg.textContent = "Copied to clipboard"; }
+        await navigator.clipboard.writeText(exportPowerLine(S.season, Number(roundSel.value)));
+        if (msg) { msg.className = "powerMsg ok"; msg.textContent = `Copied R${roundSel.value} — paste it over that line in powerData.js`; }
       } catch {
         if (msg) { msg.className = "powerMsg err"; msg.textContent = "Could not copy"; }
       }
