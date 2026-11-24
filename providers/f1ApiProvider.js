@@ -169,7 +169,6 @@ export async function loadSeason(year) {
   for (const { row } of [...resRows, ...sprintRows]) {
     if (row.Constructor && row.Constructor.url) teamWiki[row.Constructor.constructorId] = row.Constructor.url;
   }
-  const sprintSet = new Set();
   const rounds = [...group(resRows).entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([round, rows]) => {
@@ -186,49 +185,20 @@ export async function loadSeason(year) {
       const base = (s.name || `Round ${round}`).replace(" Grand Prix", "");
       const ev = computeRound(round, `${base} Sprint`, s.date || "", rows, true);
       ev.key = `${round}S`; ev.sprint = true; ev.seq = round * 2 - 1;
-      sprintSet.add(round);
       return ev;
     });
   // All events (sprint before its round's GP): totals computed from here
   const events = [...rounds, ...sprints].sort((a, b) => a.seq - b.seq);
 
+  // Season roster (latest team) — lookup list for the Power Rankings editor
   const drivers = new Map();
-  const teams = new Map();
   for (const rd of rounds) {
-    for (const d of rd.drivers) {
-      if (!drivers.has(d.id)) {
-        drivers.set(d.id, {
-          id: d.id, code: d.code, name: d.name, team: d.team, teamId: d.teamId,
-          points: 0, wins: 0, pg: 0, pgnn: 0, pgc: 0, pgns: 0, ters: 0,
-        });
-      }
-      const D = drivers.get(d.id);
-      D.team = d.team; D.teamId = d.teamId;
-      D.points += d.realPoints;
-      if (d.finish === 1) D.wins++;
-      if (d.gain !== null) {
-        D.pg += d.gain;
-        D.pgnn += Math.max(0, d.gain);
-      }
-      D.pgc += rd.pgcSplit.get(d.id) || 0;
-      D.pgns += rd.pgns.get(d.id) || 0;
-      D.ters += rd.ters.get(d.id) || 0;
-
-      if (!teams.has(d.teamId)) teams.set(d.teamId, { id: d.teamId, name: d.team, points: 0, wins: 0, pgc: 0, pgns: 0, ters: 0 });
-      const T = teams.get(d.teamId);
-      T.name = d.team;
-      T.points += d.realPoints;
-      if (d.finish === 1) T.wins++;
-      T.pgc += rd.pgcSplit.get(d.id) || 0;
-      T.pgns += rd.pgns.get(d.id) || 0;
-      T.ters += rd.ters.get(d.id) || 0;
-    }
+    for (const d of rd.drivers) drivers.set(d.id, { id: d.id, code: d.code, name: d.name, team: d.team, teamId: d.teamId });
   }
   const res = {
     source: `f1api:${year}`, season: year, schedule, rounds, sprints, events, teamWiki,
-    sprintRounds: [...sprintSet].sort((a, b) => a - b),
     completed: rounds.length,
-    drivers: [...drivers.values()], teams: [...teams.values()],
+    drivers: [...drivers.values()],
   };
   applyPowerRankings(res, year);
   applyOfficialStandings(res, driverStd, teamStd);
@@ -320,9 +290,14 @@ export function applyPowerRankings(data, year = "2026") {
   }
 }
 
-export async function loadSeasonsList() {
-  const json = await fetchJson("/seasons.json?limit=100");
-  return json.MRData.SeasonTable.Seasons.map((s) => s.season);
+
+// Power table order: chosen key first, then the other two, then wins
+function powerCmp(sort) {
+  const avg = (a, b) => (b.avgScore ?? -1) - (a.avgScore ?? -1);
+  const sum = (a, b) => (b.scoreSum ?? -1) - (a.scoreSum ?? -1);
+  const pts = (a, b) => b.value - a.value;
+  const keys = sort === "avg" ? [avg, pts, sum] : sort === "score" ? [sum, avg, pts] : [pts, avg, sum];
+  return (a, b) => keys.reduce((r, k) => r || k(a, b), 0) || b.wins - a.wins;
 }
 
 // Cumulative table up to an event. metric: real|pg|pgnn|pgc|ters|power
@@ -379,15 +354,8 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
 
   let arr = [...agg.values()];
   if (metric === "real") arr.sort((a, b) => b.value - a.value || b.wins - a.wins);
-  else if (metric === "power") {
-    if (powerSort === "avg") {
-      arr.sort((a, b) => (b.avgScore ?? -1) - (a.avgScore ?? -1) || b.value - a.value || (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || b.wins - a.wins);
-    } else if (powerSort === "score") {
-      arr.sort((a, b) => (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || (b.avgScore ?? -1) - (a.avgScore ?? -1) || b.value - a.value || b.wins - a.wins);
-    } else {
-      arr.sort((a, b) => b.value - a.value || (b.avgScore ?? -1) - (a.avgScore ?? -1) || (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || b.wins - a.wins);
-    }
-  } else arr.sort((a, b) => b.value - a.value);
+  else if (metric === "power") arr.sort(powerCmp(powerSort));
+  else arr.sort((a, b) => b.value - a.value);
   const final = metric === "real" && upto === Infinity;
   if (final && who === "drivers") arr = officialOrder(arr, data.official?.drivers);
 
@@ -429,13 +397,7 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
       for (const T of t.values()) {
         T.avgScore = T.scoreCount > 0 ? (T.scoreSum / T.scoreCount) : null;
       }
-      if (powerSort === "avg") {
-        arr = [...t.values()].sort((a, b) => (b.avgScore ?? -1) - (a.avgScore ?? -1) || b.value - a.value || (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || b.wins - a.wins);
-      } else if (powerSort === "score") {
-        arr = [...t.values()].sort((a, b) => (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || (b.avgScore ?? -1) - (a.avgScore ?? -1) || b.value - a.value || b.wins - a.wins);
-      } else {
-        arr = [...t.values()].sort((a, b) => b.value - a.value || (b.avgScore ?? -1) - (a.avgScore ?? -1) || (b.scoreSum ?? -1) - (a.scoreSum ?? -1) || b.wins - a.wins);
-      }
+      arr = [...t.values()].sort(powerCmp(powerSort));
     } else {
       arr = [...t.values()].sort((a, b) => b.value - a.value || b.wins - a.wins);
       if (final) arr = officialOrder(arr, data.official?.teams);
@@ -461,12 +423,6 @@ export function tableWithChanges(data, opts) {
 }
 
 export const getDriverStandings = (d) => computeTable(d, { who: "drivers", metric: "real" });
-export const getTeamStandings = (d) => computeTable(d, { who: "teams", metric: "real" });
-export const getPG = (d, nn = false) => computeTable(d, { who: "drivers", metric: nn ? "pgnn" : "pg" });
-export const getPGC = (d, split = true) => computeTable(d, { who: "drivers", metric: "pgc", split });
-export const getTers = (d) => computeTable(d, { who: "drivers", metric: "ters" });
-export const getTeamPGC = (d, split = true) => computeTable(d, { who: "teams", metric: "pgc", split });
-export const getTeamTers = (d) => computeTable(d, { who: "teams", metric: "ters" });
 export const getRound = (d, key) => d.events.find((r) => r.key === String(key));
 
 export function getChampions(data) {

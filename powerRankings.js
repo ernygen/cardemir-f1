@@ -1,6 +1,5 @@
 // Aramco Power Rankings (2026)
 // Scale: Linearly distributed from 25 to 1 among all entered drivers
-export const POWER_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 
 export function calculatePowerPoints(count) {
   if (!count || count <= 0) return [];

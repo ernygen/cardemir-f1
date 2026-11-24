@@ -49,9 +49,13 @@ async function boot() {
     [...$("tabs").children].forEach((x) => x.classList.toggle("active", x === b));
     render();
   };
-  $("season").onchange = async () => { S.season = $("season").value; S.round = ""; await refresh(); };
+  $("season").onchange = async () => { S.season = $("season").value; S.round = ""; PR_SELECTED_ROUND = null; await refresh(); };
   $("search").oninput = () => { S.q = $("search").value.toLocaleLowerCase("en"); render(); };
-  $("roundFilter").onchange = () => { S.round = $("roundFilter").value; render(); };
+  $("roundFilter").onchange = () => {
+    S.round = $("roundFilter").value;
+    if (/^\d+$/.test(S.round)) PR_SELECTED_ROUND = Number(S.round); // GP picked: editor follows (sprints have no rankings)
+    render();
+  };
   $("pgMode").innerHTML = PG_MODES.map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
   $("pgMode").onchange = () => { S.pgmode = $("pgMode").value; render(); };
   const POWER_SORTS = [
@@ -151,9 +155,7 @@ function drvResult(x) {
     const logo = imgTag(teamLogo(x.teamId), x.name, "logo sm");
     if (logo) return `<span class="who">${logo}<span>${esc(x.name)}</span></span>`;
   } else {
-    const d26 = driverPhoto(x.code) || driverPhoto(x.id);
-    const f1 = d26 || f1Headshot(x.given, x.family, x.id);
-    const ph = f1 ? imgTag(f1, x.name, "dphoto sm") : wikiImg(x.wiki, "dphoto sm", x.name);
+    const ph = photoFor(x, "dphoto sm");
     if (ph) return `<span class="who">${ph}<span>${esc(x.name)}</span></span>`;
   }
   return `<b>${esc(x.code)}</b> ${esc(x.name)}`;
@@ -652,7 +654,7 @@ function initBingo() {
     const i = t.dataset.i;
     const s = bingoState();
     s[i] = !s[i];
-    localStorage.setItem(BKEY, JSON.stringify(s));
+    try { localStorage.setItem(BKEY, JSON.stringify(s)); } catch {}
     initBingo();
   };
   $("bingoAdd").onclick = () => {
@@ -660,10 +662,10 @@ function initBingo() {
     if (!v || !v.trim()) return;
     const s = bingoState();
     s._custom = [...(s._custom || []), v.trim()];
-    localStorage.setItem(BKEY, JSON.stringify(s));
+    try { localStorage.setItem(BKEY, JSON.stringify(s)); } catch {}
     initBingo();
   };
-  $("bingoReset").onclick = () => { localStorage.removeItem(BKEY); initBingo(); };
+  $("bingoReset").onclick = () => { try { localStorage.removeItem(BKEY); } catch {} initBingo(); };
   paint();
 }
 

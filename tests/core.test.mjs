@@ -122,8 +122,8 @@ test("export returns saved rankings as JSON", () => withFakeStorage(() => {
 import { tableWithChanges } from "../providers/f1ApiProvider.js";
 
 function setPower(ev, list) {
-  ev.powerList = list.map(([id, p], i) => ({ id, code: id, name: id, team: "", teamId: "", score: null, rank: i + 1, pts: p }));
-  ev.power = new Map(list);
+  ev.powerList = list.map(([id, p, score = null], i) => ({ id, code: id, name: id, team: "", teamId: "t_" + id, score, rank: i + 1, pts: p }));
+  ev.power = new Map(list.map(([id, p]) => [id, p]));
   ev.powerWinner = list.length ? list[0][0] : null;
 }
 const threeRaces = () => mkData([[row("a", 1, 1)], [row("a", 1, 1)], [row("a", 1, 1)]]);
@@ -179,4 +179,18 @@ test("applyPowerRankings resolves codes to race drivers", () => {
   const ids = d.events[0].powerList.map((x) => x.id);
   assert.ok(ids.includes("norris"));
   assert.equal(d.events[0].powerWinner, "norris");
+});
+
+// --- Task 6: power sort modes (guards the powerCmp merge) ---
+test("power sort modes: pts / avg / score, drivers and teams", () => {
+  const d = threeRaces();
+  setPower(d.events[0], [["a", 25, 6], ["b", 13, 5], ["c", 1, 9.9]]);
+  setPower(d.events[1], [["b", 25, 5]]);
+  setPower(d.events[2], []);
+  const order = (who, powerSort) => computeTable(d, { who, metric: "power", powerSort }).map((x) => x.id.replace("t_", ""));
+  for (const who of ["drivers", "teams"]) {
+    assert.deepEqual(order(who, "pts"), ["b", "a", "c"]);
+    assert.deepEqual(order(who, "avg"), ["c", "a", "b"]);
+    assert.deepEqual(order(who, "score"), ["b", "c", "a"]);
+  }
 });
