@@ -454,7 +454,8 @@ export function computeTable(data, { who = "drivers", metric = "real", upto = In
 // Returns: [{..., rank, prev (rank no / null=new), diff}]
 export function tableWithChanges(data, opts) {
   const full = computeTable(data, opts);
-  const evs = data.events;
+  // Power: compare against the previous event that actually has rankings
+  const evs = opts.metric === "power" ? data.events.filter((e) => e.powerList?.length) : data.events;
   if (evs.length < 2) return full.map((x, i) => ({ ...x, rank: i + 1, prev: null, diff: null }));
   const prevSeq = evs[evs.length - 2].seq;
   const before = computeTable(data, { ...opts, upto: prevSeq });

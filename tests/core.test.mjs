@@ -117,3 +117,30 @@ test("clear hides a default round", () => withFakeStorage(() => {
 test("export returns saved rankings as JSON", () => withFakeStorage(() => {
   assert.deepEqual(JSON.parse(exportPowerRankings("2026")), JSON.parse(JSON.stringify(getPowerRankings("2026"))));
 }));
+
+// --- Task 4: power arrows ---
+import { tableWithChanges } from "../providers/f1ApiProvider.js";
+
+function setPower(ev, list) {
+  ev.powerList = list.map(([id, p], i) => ({ id, code: id, name: id, team: "", teamId: "", score: null, rank: i + 1, pts: p }));
+  ev.power = new Map(list);
+  ev.powerWinner = list.length ? list[0][0] : null;
+}
+const threeRaces = () => mkData([[row("a", 1, 1)], [row("a", 1, 1)], [row("a", 1, 1)]]);
+
+test("power arrows skip events without rankings", () => {
+  const d = threeRaces();
+  setPower(d.events[0], [["a", 25], ["b", 13], ["c", 1]]);
+  setPower(d.events[1], [["c", 25], ["a", 1]]);
+  setPower(d.events[2], []);
+  const t = tableWithChanges(d, { who: "drivers", metric: "power" });
+  assert.equal(t.find((x) => x.id === "b").diff, -1);
+});
+
+test("power arrows with one ranked event", () => {
+  const d = threeRaces();
+  setPower(d.events[0], [["a", 25], ["b", 1]]);
+  setPower(d.events[1], []); setPower(d.events[2], []);
+  const t = tableWithChanges(d, { who: "drivers", metric: "power" });
+  assert.ok(t.every((x) => x.diff === null));
+});
