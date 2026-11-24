@@ -72,7 +72,7 @@ function code(d) {
 }
 
 // Custom championship math for one event (8-point scale for sprints)
-function computeRound(roundNo, name, date, rows, sprint = false, qualiRows = [], year = "2026") {
+export function computeRound(roundNo, name, date, rows, sprint = false, qualiRows = []) {
   const PTS = sprint ? SPRINT_POINTS : PGC_POINTS;
   const qualiMap = new Map();
   for (const q of (qualiRows || [])) {
@@ -173,7 +173,7 @@ export async function loadSeason(year) {
     .map(([round, rows]) => {
       const s = schedByRound.get(round) || {};
       const qRows = qualiByRound.get(round) || [];
-      const ev = computeRound(round, s.name || `Round ${round}`, s.date || "", rows, false, qRows, year);
+      const ev = computeRound(round, s.name || `Round ${round}`, s.date || "", rows, false, qRows);
       ev.key = String(round); ev.sprint = false; ev.seq = round * 2;
       return ev;
     });
