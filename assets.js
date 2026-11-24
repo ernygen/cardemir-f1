@@ -53,7 +53,6 @@ const LOCAL_DRIVER_PHOTO = {
   ryo_hirakawa: "./hirakawa.png",
 };
 
-export const hasDriver2026 = (idOrCode) => Boolean(driverPhoto(idOrCode));
 
 export function driverPhoto(idOrCode) {
   if (!idOrCode) return null;
@@ -67,7 +66,6 @@ export function driverPhoto(idOrCode) {
   const [team, drv] = s;
   return `${IMG}/c_lfill,w_440/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/${VER}/common/f1/2026/${team}/${drv}01/2026${team}${drv}01right.webp`;
 }
-export const driverPhoto2026 = driverPhoto;
 
 // Universal F1 headshot (real photos for the 2014+ era):
 // content/dam/fom-website/drivers/{AD}/{ADSOY01_AD_SOYAD}/{adsoy}01.png

@@ -33,6 +33,10 @@ python -m http.server 8000
 # http://localhost:8000
 ```
 
+Tests (Node 20+, no dependencies): `node --test tests/`
+
+Deploying: bump every `?v=N` together (index.html, imports in app.js and providers/f1ApiProvider.js), or visitors may mix cached old modules with new ones.
+
 ## Notes
 
 - Pit-lane starters count from the back in gain math.
