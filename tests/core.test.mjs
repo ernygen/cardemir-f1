@@ -99,7 +99,7 @@ test("finite upto ignores official", () => {
 });
 
 // --- Task 3: power rankings storage ---
-import { getPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, exportPowerRankings } from "../powerRankings.js";
+import { getPowerRankings, clearRoundPowerRankings, resetAllPowerRankings, exportPowerLine } from "../powerRankings.js";
 
 function withFakeStorage(fn) {
   const m = new Map();
@@ -114,8 +114,9 @@ test("clear hides a default round", () => withFakeStorage(() => {
   assert.equal(getPowerRankings("2026")[19].length, 10);
 }));
 
-test("export returns saved rankings as JSON", () => withFakeStorage(() => {
-  assert.deepEqual(JSON.parse(exportPowerRankings("2026")), JSON.parse(JSON.stringify(getPowerRankings("2026"))));
+test("export gives the round's powerData.js line", () => withFakeStorage(() => {
+  saveRoundPowerRankings("2026", 21, [{ code: "VER", score: 9.6 }, { code: "NOR", score: null }]);
+  assert.equal(exportPowerLine("2026", 21), '    21: "VER 9.6,NOR",');
 }));
 
 // --- Task 4: power arrows ---
@@ -204,3 +205,70 @@ test("save/clear store only the edited round, not the defaults", () => withFakeS
   clearRoundPowerRankings("2026", 7);
   assert.deepEqual(stored(), ["5", "7"]);
 }));
+
+// --- Redesign: points left + reachable finishing range ---
+import { pointsLeft, finishRange } from "../providers/f1ApiProvider.js";
+
+test("pointsLeft: remaining GPs and sprints after the last run round", () => {
+  const d = { season: "2026", rounds: [{ round: 1 }, { round: 2 }], schedule: [{ round: 1 }, { round: 2 }, { round: 3, sprint: true }, { round: 4 }] };
+  assert.equal(pointsLeft(d), 25 + 8 + 25);
+});
+test("pointsLeft: fastest-lap point in 2019-2024", () => {
+  const d = { season: "2024", rounds: [{ round: 1 }], schedule: [{ round: 1 }, { round: 2 }] };
+  assert.equal(pointsLeft(d), 26);
+});
+test("pointsLeft: finished season is 0", () => {
+  assert.equal(pointsLeft({ season: "1988", rounds: [{ round: 1 }], schedule: [{ round: 1 }] }), 0);
+});
+test("finishRange: who can still reach which position", () => {
+  const t = [{ id: "ant", value: 402 }, { id: "ver", value: 304 }, { id: "ham", value: 267 }, { id: "lec", value: 250 }];
+  const r = finishRange(t, 50);
+  assert.deepEqual(r.get("ant"), { best: 1, worst: 1 });
+  assert.deepEqual(r.get("ver"), { best: 2, worst: 3 });
+  assert.deepEqual(r.get("lec"), { best: 3, worst: 4 });
+});
+test("finishRange: no points left keeps the real order, ties included", () => {
+  const r = finishRange([{ id: "a", value: 10 }, { id: "b", value: 10 }], 0);
+  assert.deepEqual(r.get("a"), { best: 1, worst: 1 });
+  assert.deepEqual(r.get("b"), { best: 2, worst: 2 });
+});
+
+// --- Power Rankings bot (scripts/power-rankings.mjs) ---
+import { parseArticle, roundForDate, renderData } from "../scripts/power-rankings.mjs";
+
+// Minimal copy of formula1.com's embedded article JSON: section image, then that section's text
+const sec = (img, text) => `[\\"$\\",\\"img\\",null,{\\"src\\":\\"https://media.formula1.com/image/upload/fom-website/2026/Power%20Rankings%202026/Mexico%20PR%202026/${img}.webp\\"}],{\\"text\\":\\"${text}\\"}`;
+const article = `<html>"datePublished":"2026-11-03T16:29:34.411Z" ` +
+  `{\\"src\\":\\"https://media.formula1.com/x/Power%20Rankings%202026/Power%20Rankings%20Hero%20Image%202026%20HEADER.webp\\"}` +
+  sec("PR_VER_MEXICO26", "Max won.") +
+  sec("Untitled%20design%20(1)", "Ryo Hirakawa scored while [Ollie Bearman](https://www.formula1.com/en/drivers/oliver-bearman) retired.") +
+  sec("Mystery", "Nobody linked here.") +
+  sec("PR_VER_MEXICO26", "duplicate render of the same section") +
+  sec("Power%20Rankings%20OVERALL%20Driver%20Standings%20Top%2010_2026", "Leaderboard") + `</html>`;
+const botRoster = [{ code: "VER", familyName: "Verstappen" }, { code: "BEA", familyName: "Bearman" }, { code: "HIR", familyName: "Hirakawa" }];
+
+test("bot: reads ranking order from section images, falls back to the first driver named in the section, else ???", () => {
+  const a = parseArticle(article, botRoster);
+  assert.equal(a.published, "2026-11-03");
+  assert.deepEqual(a.codes, ["VER", "HIR", "???"]);
+});
+test("bot: article belongs to the last round raced on or before its date", () => {
+  const schedule = [{ round: 19, date: "2026-11-01" }, { round: 20, date: "2026-11-08" }];
+  assert.equal(roundForDate(schedule, "2026-11-03"), 19);
+  assert.equal(roundForDate(schedule, "2026-10-01"), null);
+});
+test("bot: renders data file with one line per round, scores optional", () => {
+  const text = renderData({ 2026: { 2: "VER,HIR", 1: "NOR 9.8,VER 9.6" } });
+  assert.match(text, /export default \{\n  2026: \{\n    1: "NOR 9\.8,VER 9\.6",\n    2: "VER,HIR",\n  \},\n\};/);
+});
+
+import { DEFAULT_POWER_RANKINGS } from "../powerRankings.js";
+test("power data: a round without scores keeps its order with null scores", () => {
+  const r = DEFAULT_POWER_RANKINGS[2026][1];
+  assert.equal(r[0].code, "RUS");
+  assert.equal(typeof r[0].score, "number");
+});
+import { parsePowerLine } from "../powerRankings.js";
+test("power data line: scores are optional (bot writes codes only)", () => {
+  assert.deepEqual(parsePowerLine("NOR,VER 9.6"), [{ code: "NOR", score: null }, { code: "VER", score: 9.6 }]);
+});

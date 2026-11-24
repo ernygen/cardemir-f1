@@ -1,0 +1,27 @@
+// Aramco Power Rankings per Grand Prix: "CODE score,CODE score,…" in ranking order.
+// New rounds are added by scripts/power-rankings.mjs (GitHub Actions) with codes only:
+// add the judges' scores from the article's leaderboard image by editing the line ("NOR,VER" → "NOR 9.8,VER 9.6").
+export default {
+  2026: {
+    1: "RUS 9.8,LIN 9.2,ANT 8.8,LEC 8.6,BEA 8.2,HAM 8,GAS 8,BOR 8,VER 7.8,HAD 7.8",
+    2: "BEA 9.4,ANT 9.4,HAM 9,GAS 9,RUS 8.4,COL 8,SAI 8,LAW 7.8,LEC 7.6,VER 6.8,HUL 6.8,BOT 6.8",
+    3: "ANT 9.2,PIA 9,GAS 9,LEC 8.4,LAW 7.6,OCO 7.6,RUS 7.2,LIN 7.2,NOR 7,ALO 7,HAM 7",
+    4: "ANT 9.4,NOR 9,COL 9,VER 8.6,PER 7.6,SAI 7.4,PIA 7.2,LEC 7.2,ALO 6.8,BEA 6.8",
+    5: "HAM 9.2,COL 9.2,VER 8.4,ANT 8.4,RUS 8.2,LIN 8,SAI 8,LAW 8,HAD 7.2,BEA 7.2",
+    6: "ANT 10,HAM 9,GAS 9,LAW 9,LIN 8.2,VER 8,HAD 8,PER 8,OCO 7.8,ALB 7.8",
+    7: "HAM 10,NOR 8.3,RUS 8.3,ANT 8.3,GAS 8.3,VER 8,LAW 7.8,HUL 7.3,COL 7,HAD 6.8,LIN 6.8",
+    8: "RUS 9.2,VER 8.6,LAW 8.4,LIN 8,ANT 7.6,HAM 7.4,PIA 7.2,HAD 7.2,GAS 7.2,BOR 7.2",
+    9: "LEC 9,LAW 8.4,ANT 8.2,LIN 8.2,BOR 8,HAM 7.8,NOR 7.4,VER 7.4,HAD 7.2,RUS 7.2,COL 7.2",
+    10: "ANT 9.8,LEC 9,BOR 8.8,VER 8.8,LIN 8.6,HAD 8.4,NOR 8.2,COL 8,HAM 7.2,PIA 6.8,GAS 6.8,LAW 6.8,HUL 6.8",
+    11: "NOR 9.3,VER 8.8,LAW 8.5,ANT 8.3,HUL 8.3,PIA 7.8,HAM 7.5,LIN 7.5,HAD 7,ALO 7",
+    12: "NOR 9.6,ALO 8.6,ANT 8.2,HAM 8,HUL 8,LAW 7.8,TSU 7.8,RUS 7.6,GAS 7.6,LEC 7.2",
+    13: "ANT 10,GAS 9.6,VER 8.6,LIN 8.2,RUS 7.8,PIA 7.2,NOR 7,BOR 7,TSU 6.6,SAI 6.6",
+    14: "NOR 9.6,ANT 8.8,VER 8.6,COL 8.2,LIN 7.8,HUL 7.8,LEC 7.6,HAM 7.3,OCO 7.2,LAW 7",
+    15: "RUS 10,VER 9,HAD 8.8,GAS 8,OCO 8,BEA 7.4,LIN 7.2,LEC 7,LAW 7,SAI 7,PER 7",
+    16: "VER 10,ALO 9.4,HAM 9,LAW 9,ANT 8.4,HAD 7.8,LIN 7.8,HUL 7.4,OCO 7.2,SAI 7.2",
+    17: "VER 10,LAW 9,LEC 8.8,HUL 8.6,ANT 8.2,BEA 8,HAM 7.2,PIA 7,SAI 7,GAS 6.8",
+    18: "ANT 10,LAW 9.2,LEC 8.8,VER 8.8,GAS 7.8,HAM 7.2,HAD 7.2,HUL 7.2,NOR 7,ALO 6.8,LIN 6.8",
+    19: "VER 9.6,HAM 8.6,ANT 8.6,LAW 8.2,NOR 7.8,LIN 7.4,HIR 7.4,PER 7.2,BEA 7,BOR 7",
+    20: "NOR 9.8,VER 9.6,LAW 9,HAD 8.6,ALO 8.2,HUL 7.8,LIN 7.6,HAM 7.2,RUS 7,ANT 7",
+  },
+};
